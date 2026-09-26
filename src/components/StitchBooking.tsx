@@ -62,6 +62,14 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'CASH'>('VIETQR');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
 
+  React.useEffect(() => {
+    if (currentUser) {
+      setFullName(currentUser.fullName || '');
+      setPhone(currentUser.phone || '');
+      setStudentId(currentUser.studentId || '');
+    }
+  }, [currentUser]);
+
   const deviceModels: DeviceModel[] = [
     'AirPods 2',
     'AirPods 3',

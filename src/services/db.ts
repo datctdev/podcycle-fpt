@@ -84,11 +84,25 @@ export const initSupabase = () => {
 
 // SQL Schema for user to copy-paste into Supabase SQL Editor if they create a new project
 export const SUPABASE_SQL_SCHEMA = `
--- Tạo bảng Bookings trên Supabase PostgreSQL
+-- 1. BẢNG USERS (Xác thực tài khoản Sinh viên & Kỹ thuật viên)
+CREATE TABLE IF NOT EXISTS app_users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  phone TEXT NOT NULL UNIQUE,
+  student_id TEXT,
+  role TEXT NOT NULL DEFAULT 'CUSTOMER', -- 'CUSTOMER' hoặc 'TECHNICIAN'
+  campus TEXT NOT NULL,
+  avatar TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. BẢNG BOOKINGS (Đơn đặt lịch & Hồ sơ kiểm định âm học)
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   booking_code TEXT NOT NULL UNIQUE,
-  user_id TEXT,
+  user_id TEXT REFERENCES app_users(id) ON DELETE SET NULL,
   customer_name TEXT NOT NULL,
   phone TEXT NOT NULL,
   student_id TEXT,
@@ -109,8 +123,16 @@ CREATE TABLE IF NOT EXISTS bookings (
   completed_at TIMESTAMPTZ
 );
 
--- Kích hoạt Realtime cho bảng bookings
+-- 3. Kích hoạt Realtime cho cả 2 bảng
+ALTER PUBLICATION supabase_realtime ADD TABLE app_users;
 ALTER PUBLICATION supabase_realtime ADD TABLE bookings;
+
+-- 4. Thêm tài khoản mẫu kiểm thử
+INSERT INTO app_users (id, email, password_hash, full_name, phone, student_id, role, campus, avatar)
+VALUES 
+  ('usr_student_1', 'datct.se18@fpt.edu.vn', '123456', 'Châu Thành Đạt', '0901234567', 'SE180123', 'CUSTOMER', 'ĐH FPT TP.HCM (Campus Q.9)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'),
+  ('usr_tech_1', 'technician@fpt.edu.vn', '123456', 'Nguyễn Văn Minh (Kỹ Thuật Viên Trưởng Ca)', '0988776655', 'TECH-FPT-01', 'TECHNICIAN', 'ĐH FPT TP.HCM (Campus Q.9)', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80')
+ON CONFLICT (email) DO NOTHING;
 `;
 
 // Real Database Service Layer

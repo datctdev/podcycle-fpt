@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { DEMO_USERS } from '../data/mockUsers';
+import { AuthService } from '../services/auth';
 
 interface LoginPageProps {
   onLoginSuccess: (user: User) => void;
@@ -13,59 +13,68 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onGoToRegister,
   onBackToHome
 }) => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ identifier?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Validate on submit
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
+    const newFieldErrors: { identifier?: string; password?: string } = {};
 
-    setTimeout(() => {
-      // Find user in registered list or demo users
-      const allUsers = [...DEMO_USERS];
-      try {
-        const customUsers = JSON.parse(localStorage.getItem('podcycle_custom_users') || '[]');
-        allUsers.push(...customUsers);
-      } catch {
-        // ignore
+    if (!identifier.trim()) {
+      newFieldErrors.identifier = 'Vui lòng nhập Email FPT hoặc Số điện thoại.';
+    }
+    if (!password) {
+      newFieldErrors.password = 'Vui lòng nhập mật khẩu.';
+    }
+
+    setFieldErrors(newFieldErrors);
+    if (Object.keys(newFieldErrors).length > 0) return;
+
+    setIsLoading(true);
+
+    try {
+      // Call Real AuthService API
+      const result = await AuthService.login(identifier.trim(), password);
+
+      if (!result.success || !result.user) {
+        setIsLoading(false);
+        setError(result.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
+        return;
       }
 
-      const found = allUsers.find(
-        (u) => u.email.toLowerCase() === email.trim().toLowerCase()
-      );
-
-      if (found && (found.password === password || password === '123' || password === '123456')) {
-        setIsLoading(false);
-        onLoginSuccess(found);
-      } else if (found) {
-        setIsLoading(false);
-        setError('Mật khẩu không chính xác. Mẹo: nhập 123');
-      } else {
-        // If not found, create a customer session on the fly
-        const newUser: User = {
-          id: 'usr_' + Date.now(),
-          fullName: email.split('@')[0],
-          email: email.trim(),
-          phone: '0901234567',
-          studentId: 'SE180999',
-          role: 'CUSTOMER',
-          campus: 'ĐH FPT TP.HCM (Campus Q.9)',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
-        };
-        setIsLoading(false);
-        onLoginSuccess(newUser);
-      }
-    }, 400);
+      setIsLoading(false);
+      onLoginSuccess(result.user);
+    } catch (err: any) {
+      setIsLoading(false);
+      setError('Lỗi kết nối máy chủ xác thực: ' + (err.message || 'Unknown error'));
+    }
   };
 
-  const handleQuickDemo = (userRole: 'CUSTOMER' | 'TECHNICIAN') => {
-    const target = DEMO_USERS.find((u) => u.role === userRole);
-    if (target) {
-      onLoginSuccess(target);
+  // Quick Demo fill & trigger real login
+  const handleQuickDemo = async (demoEmail: string, demoPass: string) => {
+    setIdentifier(demoEmail);
+    setPassword(demoPass);
+    setError('');
+    setFieldErrors({});
+    setIsLoading(true);
+
+    try {
+      const result = await AuthService.login(demoEmail, demoPass);
+      setIsLoading(false);
+      if (result.success && result.user) {
+        onLoginSuccess(result.user);
+      } else {
+        setError(result.error || 'Lỗi đăng nhập tài khoản demo.');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setError('Lỗi kết nối máy chủ: ' + err.message);
     }
   };
 
@@ -97,73 +106,92 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <p className="text-slate-500 text-xs mt-1">Đăng nhập tài khoản sinh viên hoặc kỹ thuật viên</p>
         </div>
 
-        {/* Quick Demo Switcher Cards */}
-        <div className="bg-orange-50/80 p-3 rounded-2xl border border-orange-200 mb-5 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-[#f26f21]">
-            <span className="material-symbols-outlined text-[16px]">bolt</span>
-            <span>ĐĂNG NHẬP NHANH ĐỂ TRẢI NGHIỆM 2 VAI TRÒ:</span>
+        {/* Quick Demo Switcher Cards (Gọi API thật với tài khoản mẫu) */}
+        <div className="bg-orange-50/80 p-3.5 rounded-2xl border border-orange-200 mb-5 space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#f26f21]">
+            <span className="material-symbols-outlined text-[15px]">bolt</span>
+            <span>ĐĂNG NHẬP NHANH BẰNG TÀI KHOẢN MẪU HỆ THỐNG:</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => handleQuickDemo('CUSTOMER')}
-              className="bg-white hover:bg-slate-50 border border-orange-200 p-2.5 rounded-xl text-left transition-all active:scale-95 shadow-2xs"
+              disabled={isLoading}
+              onClick={() => handleQuickDemo('datct.se18@fpt.edu.vn', '123456')}
+              className="bg-white hover:bg-slate-50 border border-orange-200 p-2.5 rounded-xl text-left transition-all active:scale-95 shadow-2xs group"
             >
-              <span className="block text-[11px] font-bold text-[#0b1c30]">👨‍🎓 Sinh Viên</span>
-              <span className="block text-[10px] text-slate-500">Châu Thành Đạt</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-[#0b1c30]">👨‍🎓 Sinh Viên</span>
+                <span className="material-symbols-outlined text-[14px] text-slate-400 group-hover:text-[#f26f21]">arrow_forward</span>
+              </div>
+              <span className="block text-[10px] text-slate-500 truncate">datct.se18@fpt.edu.vn</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleQuickDemo('TECHNICIAN')}
-              className="bg-[#0b1c30] hover:bg-slate-800 text-white p-2.5 rounded-xl text-left transition-all active:scale-95 shadow-xs"
+              disabled={isLoading}
+              onClick={() => handleQuickDemo('technician@fpt.edu.vn', '123456')}
+              className="bg-[#0b1c30] hover:bg-slate-800 text-white p-2.5 rounded-xl text-left transition-all active:scale-95 shadow-xs group"
             >
-              <span className="block text-[11px] font-bold text-[#ffb693]">🔧 Kỹ Thuật Viên</span>
-              <span className="block text-[10px] text-slate-300">Nguyễn Văn Minh</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-[#ffb693]">🔧 Kỹ Thuật Viên</span>
+                <span className="material-symbols-outlined text-[14px] text-slate-400 group-hover:text-white">arrow_forward</span>
+              </div>
+              <span className="block text-[10px] text-slate-300 truncate">technician@fpt.edu.vn</span>
             </button>
           </div>
         </div>
 
         {/* Form Card */}
         <div className="glass-card rounded-2xl shadow-xl p-6 sm:p-8 border border-slate-200/80">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             
+            {/* Error Message */}
             {error && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
-                {error}
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
+                <span className="material-symbols-outlined text-red-500 text-[18px] shrink-0">error</span>
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Email */}
+            {/* Email / Phone */}
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700" htmlFor="email">
-                Email FPT / Số điện thoại
+              <label className="text-xs font-bold text-slate-700" htmlFor="identifier">
+                Email FPT hoặc Số điện thoại <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
-                  mail
+                  account_circle
                 </span>
                 <input
-                  id="email"
+                  id="identifier"
                   type="text"
-                  placeholder="example@fpt.edu.vn"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26f21]/20 focus:border-[#f26f21] text-xs text-[#0b1c30]"
+                  placeholder="name.mssv@fpt.edu.vn hoặc 0901234567"
+                  value={identifier}
+                  onChange={(e) => {
+                    setIdentifier(e.target.value);
+                    if (fieldErrors.identifier) setFieldErrors(prev => ({ ...prev, identifier: undefined }));
+                  }}
+                  className={`w-full pl-10 pr-4 py-2.5 bg-white border rounded-xl focus:outline-none text-xs text-[#0b1c30] transition-colors ${
+                    fieldErrors.identifier
+                      ? 'border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 focus:ring-2 focus:ring-[#f26f21]/20 focus:border-[#f26f21]'
+                  }`}
                 />
               </div>
+              {fieldErrors.identifier && (
+                <p className="text-[10px] text-red-600 mt-1 flex items-center gap-1 font-medium">
+                  <span className="material-symbols-outlined text-[13px]">warning</span>
+                  <span>{fieldErrors.identifier}</span>
+                </p>
+              )}
             </div>
 
             {/* Password */}
             <div className="space-y-1">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-semibold text-slate-700" htmlFor="password">
-                  Mật khẩu
+                <label className="text-xs font-bold text-slate-700" htmlFor="password">
+                  Mật khẩu <span className="text-red-500">*</span>
                 </label>
-                <span className="text-[11px] text-[#f26f21] cursor-pointer hover:underline">
-                  Mặc định: 123
-                </span>
               </div>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
@@ -174,9 +202,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26f21]/20 focus:border-[#f26f21] text-xs text-[#0b1c30]"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors(prev => ({ ...prev, password: undefined }));
+                  }}
+                  className={`w-full pl-10 pr-10 py-2.5 bg-white border rounded-xl focus:outline-none text-xs text-[#0b1c30] transition-colors ${
+                    fieldErrors.password
+                      ? 'border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 focus:ring-2 focus:ring-[#f26f21]/20 focus:border-[#f26f21]'
+                  }`}
                 />
                 <button
                   type="button"
@@ -188,16 +222,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </span>
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p className="text-[10px] text-red-600 mt-1 flex items-center gap-1 font-medium">
+                  <span className="material-symbols-outlined text-[13px]">warning</span>
+                  <span>{fieldErrors.password}</span>
+                </p>
+              )}
             </div>
 
             {/* Submit */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full fpt-gradient fpt-gradient-hover text-white font-bold text-xs py-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mt-2"
+              className={`w-full fpt-gradient fpt-gradient-hover text-white font-bold text-xs py-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mt-2 ${
+                isLoading ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
             >
-              <span>{isLoading ? 'Đang xác thực...' : 'Đăng Nhập'}</span>
-              <span className="material-symbols-outlined text-[18px]">login</span>
+              {isLoading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span>Đang kết nối API xác thực...</span>
+                </>
+              ) : (
+                <>
+                  <span>Đăng Nhập</span>
+                  <span className="material-symbols-outlined text-[18px]">login</span>
+                </>
+              )}
             </button>
 
             {/* Register Link */}

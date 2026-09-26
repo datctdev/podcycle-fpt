@@ -24,6 +24,7 @@ import { DEMO_USERS } from './data/mockUsers';
 import { Booking, ServiceItem, BookingStatus, User } from './types';
 import { trackEvent } from './utils/analytics';
 import { DatabaseService } from './services/db';
+import { AuthService } from './services/auth';
 
 export function App() {
   // Navigation State
@@ -266,15 +267,53 @@ export function App() {
 
         {/* VIEW: TECHNICIAN WORKSPACE (DÀNH RIÊNG CHO KỸ THUẬT VIÊN) */}
         {currentTab === 'tech-workspace' && (
-          <TechnicianWorkspace
-            currentUser={currentUser && currentUser.role === 'TECHNICIAN' ? currentUser : DEMO_USERS[1]}
-            bookings={bookings}
-            onUpdateStatus={handleUpdateStatus}
-            onOpenReceipt={handleOpenReceipt}
-            onSwitchToStudentView={() => setCurrentTab('home')}
-            onLogout={handleLogout}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-          />
+          currentUser && currentUser.role === 'TECHNICIAN' ? (
+            <TechnicianWorkspace
+              currentUser={currentUser}
+              bookings={bookings}
+              onUpdateStatus={handleUpdateStatus}
+              onOpenReceipt={handleOpenReceipt}
+              onSwitchToStudentView={() => setCurrentTab('home')}
+              onLogout={handleLogout}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
+          ) : (
+            <div className="min-h-[80vh] flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-md w-full text-center space-y-4 text-white shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-orange-500/20 text-[#f26f21] flex items-center justify-center mx-auto border border-orange-500/30">
+                  <span className="material-symbols-outlined text-[32px]">lock_person</span>
+                </div>
+                <h2 className="font-heading font-extrabold text-xl">Khu Vực Dành Cho Kỹ Thuật Viên</h2>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Bạn hiện đang ở vai trò <strong>{currentUser ? (currentUser.role === 'CUSTOMER' ? 'Sinh Viên' : currentUser.role) : 'Khách vãng lai'}</strong>. Khu vực này chỉ dành riêng cho Kỹ thuật viên trạm PODCYCLE FPT trực tiếp thao tác tiếp nhận và vệ sinh tai nghe.
+                </p>
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    onClick={async () => {
+                      const res = await AuthService.login('technician@fpt.edu.vn', '123456');
+                      if (res.user) handleLoginSuccess(res.user);
+                    }}
+                    className="w-full fpt-gradient fpt-gradient-hover text-white font-bold text-xs py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">engineering</span>
+                    <span>Đăng nhập KTV Trưởng (Nguyễn Văn Minh)</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentTab('login')}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs py-2.5 rounded-xl border border-slate-700 transition-colors"
+                  >
+                    Đăng nhập tài khoản KTV khác
+                  </button>
+                  <button
+                    onClick={() => setCurrentTab('home')}
+                    className="text-xs text-slate-400 hover:text-white pt-1 transition-colors"
+                  >
+                    ← Quay về trang chủ Sinh Viên
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
         )}
 
         {/* VIEW: HOME (PODCYCLE STITCH UI) */}
