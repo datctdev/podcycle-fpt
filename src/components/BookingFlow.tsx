@@ -6,6 +6,7 @@ import {
   Calendar, Clock, MapPin, CheckCircle2, QrCode, 
   Smartphone, ArrowRight, ArrowLeft, ShieldAlert, Copy, ExternalLink 
 } from 'lucide-react';
+import { getSePayConfig, generateSePayQRUrl } from '../services/sepay';
 
 interface BookingFlowProps {
   initialService?: ServiceItem | null;
@@ -131,7 +132,7 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
       bookingDate: selectedDate,
       slotTime: selectedSlot?.time || '09:00 - 09:30',
       paymentMethod: paymentMethod,
-      paymentStatus: paymentMethod === 'VIETQR' ? 'PAID' : 'UNPAID',
+      paymentStatus: 'UNPAID',
       status: 'PENDING',
       createdAt: new Date().toISOString()
     };
@@ -551,28 +552,32 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
             </div>
           </div>
 
-          {/* SePay Dynamic VietQR Mockup */}
-          {paymentMethod === 'VIETQR' && (
-            <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-200 flex flex-col sm:flex-row items-center gap-5">
-              <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200 shrink-0">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=TIEMTAINHO_${selectedService.price}_${customerName}`}
-                  alt="VietQR SePay" 
-                  className="w-32 h-32"
-                />
+          {/* SePay Dynamic VietQR Real */}
+          {paymentMethod === 'VIETQR' && (() => {
+            const sepayCfg = getSePayConfig();
+            return (
+              <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex flex-col sm:flex-row items-center gap-5">
+                <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200 shrink-0 flex flex-col items-center">
+                  <img 
+                    src={generateSePayQRUrl(selectedService.price, 'PREVIEW', sepayCfg)}
+                    alt="VietQR SePay Napas 24/7" 
+                    className="w-32 h-32 object-contain"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 font-semibold">Cổng SePay Napas 24/7</span>
+                </div>
+                <div className="text-xs text-slate-700 space-y-1.5 w-full">
+                  <p className="font-bold text-slate-900 text-sm">Hướng dẫn chuyển khoản qua SePay (Napas 24/7):</p>
+                  <p>Ngân hàng nhận: <strong className="text-slate-900">{sepayCfg.bank}</strong></p>
+                  <p>Số tài khoản: <strong className="font-mono text-sm text-slate-900">{sepayCfg.accountNo}</strong></p>
+                  <p>Chủ tài khoản: <strong className="text-slate-900">{sepayCfg.accountName}</strong></p>
+                  <p>Số tiền: <strong className="text-[#f26f21] text-sm">{selectedService.price.toLocaleString('vi-VN')}đ</strong></p>
+                  <p className="text-amber-800 bg-amber-100/80 p-2 rounded-lg font-medium text-[11px] mt-1 border border-amber-200">
+                    💡 Sau khi bấm "Xác Nhận Đặt Lịch", mã đơn chính thức sẽ được kích hoạt để quét mã và hệ thống tự động kiểm tra giao dịch qua SePay API v2.
+                  </p>
+                </div>
               </div>
-              <div className="text-xs text-slate-600 space-y-1 w-full">
-                <p className="font-bold text-slate-900 text-sm">Hướng dẫn chuyển khoản qua Ngân Hàng / MoMo:</p>
-                <p>Ngân hàng: <strong>MB Bank (Quân Đội)</strong></p>
-                <p>Số tài khoản: <strong>0388889999</strong></p>
-                <p>Chủ tài khoản: <strong>TIEM TAI NHO - FPT CAMPUS</strong></p>
-                <p>Số tiền: <strong className="text-blue-600">{selectedService.price.toLocaleString('vi-VN')}đ</strong></p>
-                <p className="text-amber-700 bg-amber-100/80 p-1.5 rounded font-medium mt-1">
-                  Hệ thống tự động kích hoạt vé hẹn ngay sau khi bấm Xác nhận.
-                </p>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div className="flex justify-between items-center pt-4 border-t border-slate-100">
             <button

@@ -1,36 +1,142 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Booking } from '../types';
-import { getBankConfig, generateRealVietQR } from '../services/db';
 import { playStationNotification } from '../utils/sound';
+import { trackEvent } from '../utils/analytics';
+import { 
+  getSePayConfig, 
+  generateSePayQRUrl, 
+  checkSePayPayment, 
+  getTransferSyntax, 
+  SePayTransaction 
+} from '../services/sepay';
 
 interface StitchAppointmentDetailProps {
   booking: Booking;
   onBack: () => void;
   onOpenReview: () => void;
   onConfirmPayment?: (bookingId: string) => void;
+  onOpenSettings?: () => void;
 }
 
 export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = ({
   booking,
   onBack,
   onOpenReview,
-  onConfirmPayment
+  onConfirmPayment,
+  onOpenSettings
 }) => {
-  const bankConfig = getBankConfig();
-  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
-  const [paymentSuccessNotice, setPaymentSuccessNotice] = useState(false);
+  const sepayConfig = getSePayConfig();
+  const [isManualChecking, setIsManualChecking] = useState(false);
+  const [isAutoPolling, setIsAutoPolling] = useState(false);
+  const [paymentSuccessNotice, setPaymentSuccessNotice] = useState(booking.paymentStatus === 'PAID');
+  const [matchedTx, setMatchedTx] = useState<SePayTransaction | null>(null);
+  const [checkStatusMessage, setCheckStatusMessage] = useState<string>('');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const handleVerifyPayment = () => {
-    setIsCheckingPayment(true);
-    setTimeout(() => {
-      setIsCheckingPayment(false);
-      if (onConfirmPayment) {
-        onConfirmPayment(booking.id);
-      }
-      playStationNotification('complete');
-      setPaymentSuccessNotice(true);
-    }, 1200);
+  const transferSyntax = getTransferSyntax(booking.bookingCode);
+  const qrUrl = generateSePayQRUrl(booking.amount, booking.bookingCode, sepayConfig);
+
+  // Copy to clipboard helper
+  const handleCopy = (key: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
   };
+
+  // 1. AUTO-POLLING SEPAY API V2: Kiểm tra tự động mỗi 3.5 giây khi chưa thanh toán
+  useEffect(() => {
+    if (booking.paymentStatus === 'PAID' || paymentSuccessNotice) return;
+    if (booking.paymentMethod !== 'VIETQR') return;
+    if (!sepayConfig.apiKey) {
+      setCheckStatusMessage('Chưa có SePay API Token. Vui lòng bấm vào icon Bánh răng Cài đặt để kết nối SePay.');
+      return;
+    }
+
+    let isMounted = true;
+    let pollTimer: any = null;
+
+    const poll = async () => {
+      try {
+        if (!isMounted) return;
+        setIsAutoPolling(true);
+        const result = await checkSePayPayment(booking.bookingCode, booking.amount);
+        
+        if (!isMounted) return;
+        if (result.isPaid && result.transaction) {
+          setMatchedTx(result.transaction);
+          setPaymentSuccessNotice(true);
+          playStationNotification('complete');
+          
+          if (onConfirmPayment) {
+            onConfirmPayment(booking.id);
+          }
+
+          // Track GA4 purchase completion
+          trackEvent('purchase', {
+            transaction_id: result.transaction.reference_number || booking.bookingCode,
+            value: booking.amount,
+            currency: 'VND',
+            payment_type: 'SEPAY_VIETQR'
+          });
+
+          return; // Stop polling
+        }
+      } catch (err: any) {
+        console.warn('[SePay Polling Notice]', err.message);
+      } finally {
+        if (isMounted) setIsAutoPolling(false);
+      }
+
+      // Lên lịch lần tiếp theo
+      if (isMounted && !paymentSuccessNotice && booking.paymentStatus !== 'PAID') {
+        pollTimer = setTimeout(poll, 3500);
+      }
+    };
+
+    // Chạy lần đầu sau 1 giây
+    pollTimer = setTimeout(poll, 1000);
+
+    return () => {
+      isMounted = false;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, [booking.id, booking.paymentStatus, booking.bookingCode, booking.amount, booking.paymentMethod, paymentSuccessNotice, sepayConfig.apiKey]);
+
+  // 2. Nút kiểm tra thủ công SePay
+  const handleManualCheckPayment = async () => {
+    if (!sepayConfig.apiKey) {
+      setCheckStatusMessage('Chưa cấu hình SePay API Key! Vui lòng mở Cài đặt để thêm Token.');
+      if (onOpenSettings) onOpenSettings();
+      return;
+    }
+
+    setIsManualChecking(true);
+    setCheckStatusMessage('Đang kết nối SePay API v2 rà soát sao kê ngân hàng...');
+
+    try {
+      const res = await checkSePayPayment(booking.bookingCode, booking.amount);
+      if (res.isPaid && res.transaction) {
+        setMatchedTx(res.transaction);
+        setPaymentSuccessNotice(true);
+        playStationNotification('complete');
+        if (onConfirmPayment) {
+          onConfirmPayment(booking.id);
+        }
+        setCheckStatusMessage('');
+      } else {
+        setCheckStatusMessage(
+          res.message || 'Chưa ghi nhận biến động số dư cho đơn này. Thông thường ngân hàng mất 5-15 giây để báo tin. Hệ thống đang tiếp tục auto-polling!'
+        );
+      }
+    } catch (err: any) {
+      setCheckStatusMessage('Lỗi kiểm tra SePay: ' + (err.message || 'Lỗi mạng'));
+    } finally {
+      setIsManualChecking(false);
+    }
+  };
+
+  const isPaid = booking.paymentStatus === 'PAID' || paymentSuccessNotice;
+
   return (
     <div className="pt-20 pb-28 px-4 sm:px-6 max-w-2xl mx-auto space-y-4">
       
@@ -55,7 +161,7 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
         </button>
       </div>
 
-      {/* 1. Status & ID Card (Matching Stitch UI) */}
+      {/* 1. Status & ID Card */}
       <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-200/90 space-y-3">
         <div className="flex justify-between items-start">
           <div>
@@ -70,7 +176,7 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
               check_circle
             </span>
             <span>
-              {booking.status === 'PENDING' ? 'Chờ Bàn Giao' : booking.status === 'CLEANING' ? 'Đang Vệ Sinh 30p' : 'Đã Hoàn Thành'}
+              {booking.status === 'PENDING' ? 'Chờ Bàn Giao' : booking.status === 'CLEANING' ? 'Đang Vệ Sinh 30p' : 'Đã Tiếp Nhận'}
             </span>
           </div>
         </div>
@@ -81,8 +187,8 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
         </div>
       </div>
 
-      {/* 2. Map Snippet Card (Matching Stitch UI) */}
-      <div className="relative w-full h-44 rounded-2xl overflow-hidden shadow-xs border border-slate-200 group">
+      {/* 2. Map Snippet Card */}
+      <div className="relative w-full h-40 rounded-2xl overflow-hidden shadow-xs border border-slate-200 group">
         <div 
           className="absolute inset-0 bg-cover bg-center"
           style={{
@@ -129,87 +235,210 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
           <div className="flex justify-between">
             <span className="text-slate-400">Hình thức:</span>
             <span className="font-semibold text-slate-900">
-              {booking.paymentMethod === 'VIETQR' ? 'Chuyển khoản SePay' : 'Tiền mặt tại trạm'}
+              {booking.paymentMethod === 'VIETQR' ? 'Chuyển khoản SePay (Napas 24/7)' : 'Tiền mặt tại trạm'}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Trạng thái thanh toán:</span>
-            <span className={`font-bold ${booking.paymentStatus === 'PAID' || paymentSuccessNotice ? 'text-emerald-600' : 'text-amber-600'}`}>
-              {booking.paymentStatus === 'PAID' || paymentSuccessNotice ? 'Đã Thanh Toán' : 'Chờ Thanh Toán Qua VietQR / Tiền Mặt'}
+            <span className={`font-bold ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {isPaid ? 'Đã Thanh Toán Thành Công' : 'Chờ Thanh Toán Qua SePay / Tiền Mặt'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* REAL VIETQR AUTOMATED PAYMENT SECTION */}
+      {/* 4. REAL SEPAY AUTOMATED PAYMENT SECTION */}
       {booking.paymentMethod === 'VIETQR' && (
         <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-200/90 space-y-4">
+          
+          {/* Status Header */}
           <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-            <h3 className="font-heading font-bold text-sm text-[#0b1c30] flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[#f26f21] text-[18px]">qr_code_scanner</span>
-              <span>Cổng Thanh Toán Napas 24/7 (VietQR)</span>
-            </h3>
-            {booking.paymentStatus === 'PAID' || paymentSuccessNotice ? (
-              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300">
-                <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                <span>ĐÃ THANH TOÁN THÀNH CÔNG</span>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#f26f21] text-[20px]">qr_code_scanner</span>
+              <div>
+                <h3 className="font-heading font-bold text-sm text-[#0b1c30]">
+                  Cổng Thanh Toán Tự Động SePay
+                </h3>
+                <span className="text-[10px] text-slate-400">Chuẩn VietQR Napas 24/7 Toàn Quốc</span>
+              </div>
+            </div>
+
+            {isPaid ? (
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-300">
+                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                <span>ĐÃ THANH TOÁN</span>
               </span>
             ) : (
-              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse border border-amber-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                <span>CHỜ THANH TOÁN</span>
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-amber-300">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                <span>CHỜ QUÉT MÃ</span>
               </span>
             )}
           </div>
 
-          {booking.paymentStatus !== 'PAID' && !paymentSuccessNotice ? (
+          {/* Payment Details */}
+          {!isPaid ? (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-center gap-4 bg-orange-50/60 p-4 rounded-xl border border-orange-200">
-                <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200 shrink-0">
+              
+              {/* QR Image + Account Details */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 bg-orange-50/70 p-4 rounded-2xl border border-orange-200">
+                
+                {/* QR Code */}
+                <div className="bg-white p-2.5 rounded-2xl shadow-xs border border-slate-200 shrink-0 flex flex-col items-center">
                   <img
-                    src={generateRealVietQR(bankConfig, booking.amount, booking.bookingCode)}
-                    alt="VietQR Napas 247"
-                    className="w-32 h-32 object-contain"
+                    src={qrUrl}
+                    alt="SePay VietQR Napas 247"
+                    className="w-36 h-36 object-contain rounded-lg"
                   />
+                  <span className="text-[10px] text-slate-400 font-semibold mt-1">Mở App Ngân Hàng Quét</span>
                 </div>
-                <div className="text-xs text-slate-700 leading-normal space-y-1.5 w-full">
-                  <p>Ngân hàng nhận: <strong className="text-[#0b1c30]">{bankConfig.bankName}</strong></p>
-                  <p>Số tài khoản: <strong className="font-mono text-sm text-[#0b1c30]">{bankConfig.accountNo}</strong></p>
-                  <p>Chủ tài khoản: <strong className="text-[#0b1c30]">{bankConfig.accountName}</strong></p>
-                  <p>Số tiền: <strong className="text-[#f26f21] text-sm">{booking.amount.toLocaleString('vi-VN')}đ</strong></p>
-                  <p>Nội dung CK: <strong className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-[#0b1c30]">TTN {booking.bookingCode}</strong></p>
+
+                {/* Account Details & Quick Copy */}
+                <div className="text-xs text-slate-700 leading-normal space-y-2 w-full">
+                  
+                  {/* Ngân hàng */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Ngân hàng:</span>
+                    <strong className="text-[#0b1c30]">{sepayConfig.bank}</strong>
+                  </div>
+
+                  {/* STK */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Số tài khoản:</span>
+                    <div className="flex items-center gap-1.5">
+                      <strong className="font-mono text-sm text-[#0b1c30]">{sepayConfig.accountNo}</strong>
+                      <button
+                        onClick={() => handleCopy('acc', sepayConfig.accountNo)}
+                        className="p-1 rounded hover:bg-slate-200 text-slate-600 transition-colors"
+                        title="Sao chép STK"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {copiedKey === 'acc' ? 'check' : 'content_copy'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Chủ TK */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Chủ tài khoản:</span>
+                    <strong className="text-[#0b1c30]">{sepayConfig.accountName}</strong>
+                  </div>
+
+                  {/* Số tiền */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Số tiền:</span>
+                    <div className="flex items-center gap-1.5">
+                      <strong className="text-[#f26f21] text-sm">{booking.amount.toLocaleString('vi-VN')}đ</strong>
+                      <button
+                        onClick={() => handleCopy('amount', String(booking.amount))}
+                        className="p-1 rounded hover:bg-slate-200 text-slate-600 transition-colors"
+                        title="Sao chép số tiền"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {copiedKey === 'amount' ? 'check' : 'content_copy'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Cú pháp chuyển khoản */}
+                  <div className="flex justify-between items-center pt-1 border-t border-orange-200/80">
+                    <span className="text-slate-600 font-bold">Nội dung CK:</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-orange-300 text-[#0b1c30]">
+                        {transferSyntax}
+                      </span>
+                      <button
+                        onClick={() => handleCopy('content', transferSyntax)}
+                        className="p-1 rounded hover:bg-slate-200 text-slate-600 transition-colors"
+                        title="Sao chép nội dung"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {copiedKey === 'content' ? 'check' : 'content_copy'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
+              {/* Realtime Auto-Polling Pulse Indicator */}
+              <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isAutoPolling ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`}></span>
+                  <span>
+                    {isAutoPolling
+                      ? 'SePay API đang rà soát biến động số dư tự động (mỗi 3 giây)...'
+                      : 'Hệ thống tự động phát hiện khi tài khoản nhận được tiền'}
+                  </span>
+                </div>
+                {!sepayConfig.apiKey && onOpenSettings && (
+                  <button
+                    onClick={onOpenSettings}
+                    className="text-[#f26f21] hover:underline font-bold text-[10px]"
+                  >
+                    Cài đặt SePay Key
+                  </button>
+                )}
+              </div>
+
+              {/* Status Message */}
+              {checkStatusMessage && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-amber-600 shrink-0">info</span>
+                  <span className="flex-1">{checkStatusMessage}</span>
+                </div>
+              )}
+
+              {/* Manual Check Button */}
               <button
-                onClick={handleVerifyPayment}
-                disabled={isCheckingPayment}
-                className="w-full bg-[#10B981] hover:bg-[#059669] text-white font-bold text-xs py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+                onClick={handleManualCheckPayment}
+                disabled={isManualChecking}
+                className="w-full bg-[#10B981] hover:bg-[#059669] text-white font-bold text-xs py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-75"
               >
-                {isCheckingPayment ? (
+                {isManualChecking ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>Đang kết nối API kiểm tra biến động số dư ngân hàng...</span>
+                    <span>Đang gọi SePay API v2 đối soát sao kê...</span>
                   </>
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                    <span>Tôi Đã Chuyển Khoản ➔ Kiểm Tra & Xác Nhận Đơn</span>
+                    <span>Tôi Đã Chuyển Khoản ➔ Kiểm Tra Biến Động Ngay</span>
                   </>
                 )}
               </button>
+
             </div>
           ) : (
-            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl text-center space-y-1 text-xs text-emerald-800">
-              <span className="material-symbols-outlined text-emerald-600 text-[28px] mx-auto block">task_alt</span>
-              <p className="font-bold text-sm">Giao dịch đã được hệ thống ghi nhận thành công!</p>
-              <p className="text-slate-600">Mã giao dịch đối soát Napas: <strong>TX-{booking.bookingCode}-OK</strong></p>
+            /* PAID SUCCESS BANNER */
+            <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl text-center space-y-2 text-xs text-emerald-900 animate-in fade-in">
+              <span className="material-symbols-outlined text-emerald-600 text-[36px] mx-auto block">
+                task_alt
+              </span>
+              <p className="font-heading font-extrabold text-sm text-emerald-800">
+                SePay: Đã Ghi Nhận Thanh Toán Chuyển Khoản Thành Công!
+              </p>
+              <div className="text-slate-600 space-y-0.5 text-[11px] pt-1 border-t border-emerald-200/70">
+                <p>
+                  Mã đối soát ngân hàng: <strong className="font-mono text-slate-800">{matchedTx?.reference_number || `FT-${booking.bookingCode}-OK`}</strong>
+                </p>
+                {matchedTx?.transaction_date && (
+                  <p>Thời gian giao dịch: <strong>{matchedTx.transaction_date}</strong></p>
+                )}
+                {matchedTx?.amount_in && (
+                  <p>Số tiền đã nhận: <strong className="text-emerald-700">{parseFloat(matchedTx.amount_in).toLocaleString('vi-VN')}đ</strong></p>
+                )}
+              </div>
             </div>
           )}
+
         </div>
       )}
 
-      {/* 4. QR Check-in Pass Card */}
+      {/* 5. QR Check-in Pass Card */}
       <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200/90 text-center space-y-3">
         <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
           MÃ QR CHECK-IN TẠI TRẠM SẢNH FPT

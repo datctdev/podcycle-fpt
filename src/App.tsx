@@ -33,13 +33,15 @@ function AppointmentDetailRoute({
   activeBooking,
   onBack,
   onOpenReview,
-  onConfirmPayment
+  onConfirmPayment,
+  onOpenSettings
 }: {
   bookings: Booking[];
   activeBooking: Booking | null;
   onBack: () => void;
   onOpenReview: () => void;
   onConfirmPayment: (id: string) => void;
+  onOpenSettings?: () => void;
 }) {
   const { bookingCode } = useParams<{ bookingCode?: string }>();
   const targetBooking = bookingCode
@@ -70,6 +72,7 @@ function AppointmentDetailRoute({
       onBack={onBack}
       onOpenReview={onOpenReview}
       onConfirmPayment={onConfirmPayment}
+      onOpenSettings={onOpenSettings}
     />
   );
 }
@@ -448,6 +451,7 @@ export function App() {
                   onBack={() => navigate('/appointments')}
                   onOpenReview={() => setIsReviewOpen(true)}
                   onConfirmPayment={handleConfirmPayment}
+                  onOpenSettings={() => setIsSettingsOpen(true)}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -464,6 +468,7 @@ export function App() {
                   onBack={() => navigate('/appointments')}
                   onOpenReview={() => setIsReviewOpen(true)}
                   onConfirmPayment={handleConfirmPayment}
+                  onOpenSettings={() => setIsSettingsOpen(true)}
                 />
               ) : (
                 <Navigate to="/login" replace />

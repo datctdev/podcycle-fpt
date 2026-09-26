@@ -2,11 +2,8 @@ import React, { useState } from 'react';
 import { CAMPUSES, SERVICES } from '../services/dataInit';
 import { ServiceItem, DeviceModel, Booking, TimeSlot, User } from '../types';
 import { trackEvent } from '../utils/analytics';
-import { 
-  DatabaseService, 
-  getBankConfig, 
-  generateRealVietQR 
-} from '../services/db';
+import { DatabaseService } from '../services/db';
+import { getSePayConfig, generateSePayQRUrl } from '../services/sepay';
 
 interface StitchBookingProps {
   initialService?: ServiceItem | null;
@@ -30,8 +27,8 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
     initialService || SERVICES[0]
   );
 
-  // Bank Configuration for Real VietQR
-  const bankConfig = getBankConfig();
+  // SePay Configuration for Real VietQR
+  const sepayConfig = getSePayConfig();
 
   // Dates: Next 5 days
   const dateOptions = [
@@ -133,7 +130,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
       bookingDate: selectedDate,
       slotTime: selectedSlot.time,
       paymentMethod: paymentMethod,
-      paymentStatus: paymentMethod === 'VIETQR' ? 'PAID' : 'UNPAID',
+      paymentStatus: 'UNPAID',
       status: 'PENDING',
       createdAt: new Date().toISOString()
     };
@@ -409,7 +406,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
           >
             <div className="flex items-center gap-2 font-bold text-xs text-[#0b1c30]">
               <span className="material-symbols-outlined text-[#f26f21] text-[18px]">qr_code_2</span>
-              <span>Chuyển khoản VietQR Real</span>
+              <span>Chuyển khoản SePay (Napas 24/7)</span>
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
               Quét từ app ngân hàng thật (VCB, MB, Techcombank, MoMo...), tự động điền STK & số tiền
@@ -436,18 +433,18 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
           <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex flex-col sm:flex-row items-center gap-4">
             <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200 shrink-0">
               <img
-                src={generateRealVietQR(bankConfig, selectedService.price, 'PODCYCLE')}
-                alt="VietQR Napas 247"
+                src={generateSePayQRUrl(selectedService.price, 'PODCYCLE', sepayConfig)}
+                alt="SePay VietQR Napas 247"
                 className="w-28 h-28 object-contain"
               />
             </div>
             <div className="text-xs text-slate-700 leading-normal space-y-1 w-full">
               <div className="flex items-center justify-between">
-                <p className="font-bold text-[#0b1c30]">Ngân hàng: {bankConfig.bankName}</p>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">Napas 24/7</span>
+                <p className="font-bold text-[#0b1c30]">Ngân hàng: {sepayConfig.bank}</p>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">SePay Napas 24/7</span>
               </div>
-              <p>Số tài khoản: <strong className="font-mono text-sm text-[#0b1c30]">{bankConfig.accountNo}</strong></p>
-              <p>Chủ tài khoản: <strong>{bankConfig.accountName}</strong></p>
+              <p>Số tài khoản: <strong className="font-mono text-sm text-[#0b1c30]">{sepayConfig.accountNo}</strong></p>
+              <p>Chủ tài khoản: <strong>{sepayConfig.accountName}</strong></p>
               <p>Số tiền: <strong className="text-[#f26f21] text-sm">{selectedService.price.toLocaleString('vi-VN')}đ</strong></p>
               <p className="text-[10px] text-slate-500 italic">Mở bất kỳ app ngân hàng nào quét mã để chuyển khoản chính xác.</p>
             </div>

@@ -8,4 +8,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api/sepay': {
+        target: 'https://userapi.sepay.vn',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/sepay/, '')
+      }
+    }
+  }
 })

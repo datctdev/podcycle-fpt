@@ -253,9 +253,21 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
                       <span className="font-heading font-bold text-xs text-[#ffb693] font-mono">
                         {b.bookingCode}
                       </span>
-                      <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded font-medium">
-                        {b.deviceModel}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {b.paymentStatus === 'PAID' ? (
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                            <span className="material-symbols-outlined text-[11px]">verified</span>
+                            <span>SePay Đã TT</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-medium">
+                            Chưa TT ({b.paymentMethod === 'VIETQR' ? 'SePay' : 'Tiền mặt'})
+                          </span>
+                        )}
+                        <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-medium">
+                          {b.deviceModel}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="text-xs text-slate-300">
@@ -423,19 +435,35 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
                       <span className="font-heading font-bold text-xs text-blue-300 font-mono">
                         {b.bookingCode}
                       </span>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full">
-                        Âm Lượng: 98%
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {b.paymentStatus === 'PAID' ? (
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                            <span className="material-symbols-outlined text-[11px]">verified</span>
+                            <span>SePay Đã TT</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-bold">
+                            Chưa TT: {b.amount.toLocaleString('vi-VN')}đ
+                          </span>
+                        )}
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full">
+                          Âm: 98%
+                        </span>
+                      </div>
                     </div>
 
                     <div className="text-xs text-slate-300">
                       <p className="font-bold text-white">{b.customerName} ({b.phone})</p>
-                      <p className="text-[11px] text-slate-400">{b.deviceModel} • {b.amount.toLocaleString('vi-VN')}đ</p>
+                      <p className="text-[11px] text-slate-400">{b.deviceModel} • {b.serviceName}</p>
                     </div>
 
                     <div className="bg-slate-900/60 p-2 rounded-lg text-[11px] text-slate-300">
-                      <p className="text-emerald-400 font-semibold">✓ Sinh viên đã đến bàn trực sảnh</p>
-                      <p className="text-slate-400 text-[10px]">Hướng dẫn khách đeo thử và bật bài nhạc kiểm tra âm lượng</p>
+                      <p className="text-emerald-400 font-semibold">✓ Sinh viên kiểm âm tại sảnh</p>
+                      <p className="text-slate-400 text-[10px]">
+                        {b.paymentStatus === 'PAID' 
+                          ? 'Đơn đã thanh toán qua SePay. KTV cho khách nghe thử và ký bàn giao.' 
+                          : `Thu ${b.amount.toLocaleString('vi-VN')}đ tiền mặt hoặc chờ khách quét QR SePay tại bàn.`}
+                      </p>
                     </div>
 
                     <button
@@ -449,7 +477,11 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
                       className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-xs"
                     >
                       <span className="material-symbols-outlined text-[16px]">verified</span>
-                      <span>Khách Đã Test & Bàn Giao</span>
+                      <span>
+                        {b.paymentStatus === 'PAID'
+                          ? 'Khách Đã Test Âm ➔ Bàn Giao Máy'
+                          : `Xác Nhận Đã Thu ${b.amount.toLocaleString('vi-VN')}đ & Bàn Giao`}
+                      </span>
                     </button>
                   </div>
                 ))
