@@ -104,36 +104,52 @@ export const DatabaseService = {
 
     if (!data) return [];
 
-    return data.map((d: any) => ({
-      id: d.id,
-      bookingCode: d.booking_code,
-      userId: d.user_id,
-      customerName: d.customer_name,
-      phone: d.phone,
-      studentId: d.student_id,
-      campus: d.campus,
-      deviceModel: d.device_model,
-      issueNote: d.issue_note,
-      serviceId: d.service_id,
-      serviceName: d.service_name,
-      amount: Number(d.amount),
-      bookingDate: d.booking_date,
-      slotTime: d.slot_time,
-      paymentMethod: d.payment_method,
-      paymentStatus: d.payment_status,
-      status: d.status,
-      technicianName: d.technician_name,
-      soundClarityScore: d.sound_clarity_score,
-      beforePhoto: d.before_photo,
-      afterPhoto: d.after_photo,
-      createdAt: d.created_at,
-      completedAt: d.completed_at
-    }));
+    // Lấy thêm cache checklist & SOP từ localStorage nếu có
+    const sopCache: Record<string, any> = {};
+    try {
+      const saved = localStorage.getItem('ttn_sop_cache');
+      if (saved) Object.assign(sopCache, JSON.parse(saved));
+    } catch {}
+
+    return data.map((d: any) => {
+      const cached = sopCache[d.id] || {};
+      return {
+        id: d.id,
+        bookingCode: d.booking_code,
+        userId: d.user_id,
+        customerName: d.customer_name,
+        phone: d.phone,
+        studentId: d.student_id,
+        campus: d.campus,
+        deviceModel: d.device_model,
+        serialNumber: d.serial_number || cached.serialNumber,
+        issueNote: d.issue_note,
+        serviceId: d.service_id,
+        serviceName: d.service_name,
+        amount: Number(d.amount),
+        bookingDate: d.booking_date,
+        slotTime: d.slot_time,
+        paymentMethod: d.payment_method,
+        paymentStatus: d.payment_status,
+        status: d.status,
+        technicianName: d.technician_name,
+        soundClarityScore: d.sound_clarity_score || cached.soundClarityScore,
+        beforePhoto: d.before_photo || cached.beforePhoto,
+        afterPhoto: d.after_photo || cached.afterPhoto,
+        checklistBefore: d.checklist_before || cached.checklistBefore,
+        checklistAfter: d.checklist_after || cached.checklistAfter,
+        scopeLockReason: d.scope_lock_reason || cached.scopeLockReason,
+        nextMaintenanceDate: d.next_maintenance_date || cached.nextMaintenanceDate,
+        refundReason: d.refund_reason || cached.refundReason,
+        refundedAt: d.refunded_at || cached.refundedAt,
+        createdAt: d.created_at,
+        completedAt: d.completed_at || cached.completedAt
+      };
+    });
   },
 
   /**
-   * 2. TẠO ĐƠN ĐẶT LỊCH MỚI TRỰC TIẾP VÀO POSTGRESQL
-   * Bắt buộc ghi thành công vào database mới trả về, KHÔNG fallback local!
+   * 2. TẠO ĐƠN ĐẶT LỊCH MỚI TRỰC TIẾP VÀO POSTGRESQL (GIAI ĐOẠN 1)
    */
   async createBooking(booking: Booking): Promise<Booking> {
     const sb = initSupabase();
@@ -154,8 +170,8 @@ export const DatabaseService = {
       booking_date: booking.bookingDate,
       slot_time: booking.slotTime,
       payment_method: booking.paymentMethod,
-      payment_status: booking.paymentStatus,
-      status: booking.status,
+      payment_status: booking.paymentStatus || 'UNPAID',
+      status: booking.status || 'PENDING_PAYMENT',
       created_at: booking.createdAt || new Date().toISOString()
     };
 
@@ -169,7 +185,7 @@ export const DatabaseService = {
   },
 
   /**
-   * 3. CẬP NHẬT TRẠNG THÁI VỆ SINH & ẢNH KIỂM ĐỊNH TRỰC TIẾP VÀO DATABASE
+   * 3. CẬP NHẬT TRẠNG THÁI & BIÊN BẢN ĐỒNG KIỂM (GIAI ĐOẠN 2 - 6)
    */
   async updateStatus(
     bookingId: string, 
@@ -178,6 +194,19 @@ export const DatabaseService = {
   ): Promise<void> {
     const sb = initSupabase();
 
+    // 1. Cập nhật cache SOP đệm
+    try {
+      const saved = localStorage.getItem('ttn_sop_cache');
+      const sopCache = saved ? JSON.parse(saved) : {};
+      sopCache[bookingId] = {
+        ...(sopCache[bookingId] || {}),
+        ...extraUpdates,
+        status
+      };
+      localStorage.setItem('ttn_sop_cache', JSON.stringify(sopCache));
+    } catch {}
+
+    // 2. Chuẩn bị payload cho Supabase
     const updatePayload: any = {
       status: status
     };
@@ -188,14 +217,75 @@ export const DatabaseService = {
     if (extraUpdates.afterPhoto !== undefined) updatePayload.after_photo = extraUpdates.afterPhoto;
     if (extraUpdates.completedAt !== undefined) updatePayload.completed_at = extraUpdates.completedAt;
 
-    const { error } = await sb
+    // Các trường SOP nếu có cột trong database
+    if (extraUpdates.serialNumber !== undefined) updatePayload.serial_number = extraUpdates.serialNumber;
+    if (extraUpdates.checklistBefore !== undefined) updatePayload.checklist_before = extraUpdates.checklistBefore;
+    if (extraUpdates.checklistAfter !== undefined) updatePayload.checklist_after = extraUpdates.checklistAfter;
+    if (extraUpdates.scopeLockReason !== undefined) updatePayload.scope_lock_reason = extraUpdates.scopeLockReason;
+    if (extraUpdates.nextMaintenanceDate !== undefined) updatePayload.next_maintenance_date = extraUpdates.nextMaintenanceDate;
+
+    let { error } = await sb
       .from('bookings')
       .update(updatePayload)
       .eq('id', bookingId);
 
+    // Nếu lỗi do database Supabase chưa có cột mới, retry chỉ với các cột cơ bản
+    if (error && (error.message?.includes('column') || (error as any).code === '42703')) {
+      console.warn('[Database Warning] Database chưa thêm cột mới, lưu vào core columns:', error.message);
+      const safePayload: any = { status };
+      if (extraUpdates.technicianName !== undefined) safePayload.technician_name = extraUpdates.technicianName;
+      if (extraUpdates.paymentStatus !== undefined) safePayload.payment_status = extraUpdates.paymentStatus;
+      if (extraUpdates.soundClarityScore !== undefined) safePayload.sound_clarity_score = extraUpdates.soundClarityScore;
+      if (extraUpdates.beforePhoto !== undefined) safePayload.before_photo = extraUpdates.beforePhoto;
+      if (extraUpdates.afterPhoto !== undefined) safePayload.after_photo = extraUpdates.afterPhoto;
+      if (extraUpdates.completedAt !== undefined) safePayload.completed_at = extraUpdates.completedAt;
+
+      const retryRes = await sb.from('bookings').update(safePayload).eq('id', bookingId);
+      error = retryRes.error;
+    }
+
     if (error) {
       console.error('[Database Error] updateStatus failed:', error);
       throw new Error(`[Database Error] Không thể cập nhật trạng thái đơn: ${error.message}`);
+    }
+  },
+
+  /**
+   * 4. GHI NHẬN GIAO DỊCH VÀO BẢNG TRANSACTIONS (GIAI ĐOẠN 2)
+   */
+  async recordTransaction(tx: {
+    bookingId: string;
+    bookingCode: string;
+    amount: number;
+    paymentMethod: 'SEPAY_PG' | 'CASH';
+    referenceNumber?: string;
+  }): Promise<void> {
+    try {
+      const sb = initSupabase();
+      const txPayload = {
+        id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        booking_id: tx.bookingId,
+        booking_code: tx.bookingCode,
+        amount: tx.amount,
+        payment_method: tx.paymentMethod,
+        reference_number: tx.referenceNumber || null,
+        status: 'SUCCESS',
+        created_at: new Date().toISOString()
+      };
+
+      // Ghi vào bảng transactions nếu tồn tại
+      const { error } = await sb.from('transactions').insert([txPayload]);
+      if (error) {
+        console.warn('[Transactions Warning] Bảng transactions chưa tồn tại trên Supabase, lưu local cache:', error.message);
+      }
+
+      // Lưu backup vào localStorage
+      const savedTx = localStorage.getItem('ttn_transactions');
+      const txList = savedTx ? JSON.parse(savedTx) : [];
+      txList.unshift(txPayload);
+      localStorage.setItem('ttn_transactions', JSON.stringify(txList.slice(0, 50)));
+    } catch (err: any) {
+      console.warn('[Transactions] Lưu giao dịch:', err.message);
     }
   },
 

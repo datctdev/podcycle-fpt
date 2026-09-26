@@ -9,6 +9,7 @@ import {
   getSePayApiToken,
   checkSePayPgOrderStatus
 } from '../services/sepay';
+import { DatabaseService } from '../services/db';
 
 interface StitchAppointmentDetailProps {
   booking: Booking;
@@ -58,6 +59,15 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
     if (paymentSuccessNotice || booking.paymentStatus === 'PAID') return;
     setPaymentSuccessNotice(true);
     playStationNotification('complete');
+
+    // Ghi nhận giao dịch vào bảng transactions (Giai đoạn 2)
+    DatabaseService.recordTransaction({
+      bookingId: booking.id,
+      bookingCode: booking.bookingCode,
+      amount: booking.amount,
+      paymentMethod: 'SEPAY_PG'
+    });
+
     if (onConfirmPayment) {
       onConfirmPayment(booking.id);
     }
@@ -516,22 +526,102 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
         </div>
       )}
 
-      {/* 5. QR Check-in Pass Card */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200/90 text-center space-y-3">
-        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-          MÃ CHECK-IN TẠI TRẠM SẢNH FPT
-        </span>
+      {/* 5. THẺ VÉ HẸN ĐIỆN TỬ O2O (DIGITAL APPOINTMENT PASS - GIAI ĐOẠN 2 & 3) */}
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/90 relative overflow-hidden space-y-4">
+        
+        {/* Ticket Header */}
+        <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-200">
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-xl bg-orange-100 text-[#f26f21] flex items-center justify-center font-bold">
+              <span className="material-symbols-outlined text-[18px]">confirmation_number</span>
+            </span>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                FPT O2O STATION PASS
+              </span>
+              <h3 className="font-heading font-extrabold text-sm text-[#0b1c30]">
+                VÉ HẸN ĐIỆN TỬ BÀN GIAO AIRPODS
+              </h3>
+            </div>
+          </div>
 
-        <div className="flex justify-center py-1">
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
-            <span className="font-mono font-extrabold text-2xl text-slate-900 tracking-wider block">
-              {booking.bookingCode}
-            </span>
-            <span className="text-[11px] text-slate-500 mt-1 block">
-              Đọc mã này cho kỹ thuật viên tại sảnh tự học để dán mã số niêm phong hộp sạc
-            </span>
+          <div className="text-right">
+            {isPaid ? (
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-300 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[12px]">verified</span>
+                <span>VÉ HỢP LỆ</span>
+              </span>
+            ) : (
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-amber-300">
+                CHỜ THANH TOÁN
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Mã QR Định Danh Vé Hẹn Cho KTV Quét Camera Check-in */}
+        <div className="flex flex-col sm:flex-row items-center gap-5 bg-gradient-to-br from-slate-50 to-orange-50/40 p-4 rounded-2xl border border-slate-200/80">
+          <div className="bg-white p-2.5 rounded-2xl border-2 border-dashed border-[#f26f21]/40 shadow-sm shrink-0 flex flex-col items-center">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(booking.bookingCode)}`}
+              alt={`QR Code Pass ${booking.bookingCode}`}
+              className="w-36 h-36 object-contain rounded-lg"
+              loading="lazy"
+            />
+            <span className="font-mono font-black text-sm text-[#0b1c30] mt-1.5 tracking-wider">
+              {booking.bookingCode}
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs flex-1 text-center sm:text-left">
+            <p className="font-bold text-slate-800 text-sm flex items-center justify-center sm:justify-start gap-1 text-[#f26f21]">
+              <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+              <span>Đưa mã QR này cho KTV tại bàn trực</span>
+            </p>
+            <p className="text-slate-600 leading-relaxed text-[11px]">
+              Kỹ thuật viên sẽ dùng camera quét mã trên vé này để <strong>Check-in</strong> và cùng bạn thực hiện <strong>Đồng kiểm lâm sàng màng loa</strong> trước khi nhận máy.
+            </p>
+            <div className="pt-1.5 border-t border-slate-200/60 text-[11px] text-slate-500 space-y-1">
+              <p>📍 <strong>Địa điểm:</strong> Bàn trực sảnh tự học Tòa nhà A (Cạnh Canteen)</p>
+              <p>⏰ <strong>Khung giờ:</strong> {booking.bookingDate} ({booking.slotTime})</p>
+              <p>🎧 <strong>Thiết bị:</strong> {booking.deviceModel} • {booking.customerName}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 6-Stage SOP Progress Tracker */}
+        <div className="space-y-2 pt-2">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+            Tiến trình xử lý 6 giai đoạn chuẩn:
+          </span>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-center text-[10px]">
+            <div className={`p-2 rounded-xl border ${isPaid ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+              <span className="block text-[14px]">✓</span>
+              <span>1. Đặt & TT</span>
+            </div>
+            <div className={`p-2 rounded-xl border ${booking.status === 'CHECKED_IN' || booking.status === 'PROCESSING' || booking.status === 'CLEANING' || booking.status === 'READY_FOR_PICKUP' || booking.status === 'READY' || booking.status === 'COMPLETED' ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : isPaid ? 'bg-orange-50 border-orange-300 text-orange-800 font-bold animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+              <span className="block text-[14px]">📍</span>
+              <span>2. Tới sảnh</span>
+            </div>
+            <div className={`p-2 rounded-xl border ${booking.status === 'CHECKED_IN' ? 'bg-blue-50 border-blue-300 text-blue-800 font-bold animate-pulse' : booking.status === 'PROCESSING' || booking.status === 'CLEANING' || booking.status === 'READY_FOR_PICKUP' || booking.status === 'READY' || booking.status === 'COMPLETED' ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+              <span className="block text-[14px]">🔍</span>
+              <span>3. Đồng kiểm</span>
+            </div>
+            <div className={`p-2 rounded-xl border ${booking.status === 'PROCESSING' || booking.status === 'CLEANING' ? 'bg-purple-50 border-purple-300 text-purple-800 font-bold animate-pulse' : booking.status === 'READY_FOR_PICKUP' || booking.status === 'READY' || booking.status === 'COMPLETED' ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+              <span className="block text-[14px]">⚡</span>
+              <span>4. Vệ sinh 30p</span>
+            </div>
+            <div className={`p-2 rounded-xl border ${booking.status === 'READY_FOR_PICKUP' || booking.status === 'READY' ? 'bg-blue-50 border-blue-300 text-blue-800 font-bold animate-pulse' : booking.status === 'COMPLETED' ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+              <span className="block text-[14px]">🎧</span>
+              <span>5. Test âm</span>
+            </div>
+            <div className={`p-2 rounded-xl border ${booking.status === 'COMPLETED' ? 'bg-emerald-50 border-emerald-400 text-emerald-800 font-bold ring-2 ring-emerald-500/20' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+              <span className="block text-[14px]">★</span>
+              <span>6. Hoàn tất</span>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Back button */}

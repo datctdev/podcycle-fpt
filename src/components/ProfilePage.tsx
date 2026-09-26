@@ -7,6 +7,7 @@ interface ProfilePageProps {
   onLogout: () => void;
   onGoToTechnicianWorkspace: () => void;
   onNavigate?: (tab: string) => void;
+  onOpenReceipt?: (booking: Booking) => void;
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({
@@ -14,7 +15,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   bookings,
   onLogout,
   onGoToTechnicianWorkspace,
-  onNavigate
+  onNavigate,
+  onOpenReceipt
 }) => {
   const userBookings = bookings.filter(
     (b) => b.phone === user.phone || b.studentId === user.studentId
@@ -84,6 +86,59 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             <span className="font-semibold text-slate-800">{user.campus || 'FPT Campus Q.9'}</span>
           </div>
         </div>
+      </div>
+
+      {/* Lịch Sử Bảo Dưỡng & E-Receipt (Giai đoạn 6) */}
+      <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-200/90 space-y-3 text-xs">
+        <div className="flex justify-between items-center">
+          <h3 className="font-heading font-bold text-sm text-[#0b1c30]">Lịch Sử Bảo Dưỡng & E-Receipt</h3>
+          <span className="text-[10px] text-[#f26f21] font-bold bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
+            {userBookings.length} lượt
+          </span>
+        </div>
+
+        {userBookings.length === 0 ? (
+          <p className="text-slate-400 text-xs py-2">Bạn chưa có lịch hẹn bảo dưỡng nào.</p>
+        ) : (
+          <div className="space-y-2">
+            {userBookings.map((b) => (
+              <div
+                key={b.id}
+                className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between"
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <strong className="font-mono text-slate-800">{b.bookingCode}</strong>
+                    <span className="text-[10px] text-slate-500">({b.deviceModel})</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{b.bookingDate} • {b.serviceName}</p>
+                  {b.nextMaintenanceDate && (
+                    <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+                      ⏰ Nhắc vệ sinh định kỳ: {b.nextMaintenanceDate}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => onOpenReceipt && onOpenReceipt(b)}
+                    className="bg-white hover:bg-slate-100 text-[#0b1c30] text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-300 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[13px] text-[#f26f21]">receipt_long</span>
+                    <span>Xem E-Receipt</span>
+                  </button>
+                  <button
+                    onClick={() => onNavigate && onNavigate(`detail/${b.bookingCode}`)}
+                    className="bg-orange-100 hover:bg-orange-200 text-[#f26f21] text-[10px] font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">confirmation_number</span>
+                    <span>Vé Hẹn QR</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Technician Switcher (If technician or for test convenience) */}

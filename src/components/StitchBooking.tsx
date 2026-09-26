@@ -128,7 +128,8 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
       slotTime: selectedSlot.time,
       paymentMethod: paymentMethod,
       paymentStatus: 'UNPAID',
-      status: 'PENDING',
+      status: 'PENDING_PAYMENT',
+      qrTicketCode: 'TICKET-' + bookingCode,
       createdAt: new Date().toISOString()
     };
 

@@ -291,9 +291,9 @@ export function App() {
     }
   };
 
-  // Automated Payment confirmation
+  // Automated Payment confirmation (Giai đoạn 2: Thanh toán thành công -> CONFIRMED)
   const handleConfirmPayment = (bookingId: string) => {
-    handleUpdateStatus(bookingId, 'CHECKED_IN', { paymentStatus: 'PAID' });
+    handleUpdateStatus(bookingId, 'CONFIRMED', { paymentStatus: 'PAID' });
   };
 
   // Receipt Modal
@@ -308,7 +308,7 @@ export function App() {
     : bookings;
 
   const activeCount = bookings.filter(
-    (b) => b.status === 'PENDING' || b.status === 'CLEANING' || b.status === 'CHECKED_IN'
+    (b) => b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && b.status !== 'REFUNDED'
   ).length;
 
   const isTechWorkspace = location.pathname.startsWith('/tech-workspace');
@@ -487,6 +487,7 @@ export function App() {
                   onLogout={handleLogout}
                   onGoToTechnicianWorkspace={() => navigate('/tech-workspace')}
                   onNavigate={handleSelectTab}
+                  onOpenReceipt={handleOpenReceipt}
                 />
               ) : (
                 <Navigate to="/login" replace />

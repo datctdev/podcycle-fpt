@@ -18,11 +18,34 @@ export const StitchAppointmentList: React.FC<StitchAppointmentListProps> = ({
 
   const filtered = bookings.filter((b) => {
     if (filter === 'ALL') return true;
-    if (filter === 'PENDING') return b.status === 'PENDING' || b.status === 'CHECKED_IN';
-    if (filter === 'CLEANING') return b.status === 'CLEANING';
-    if (filter === 'COMPLETED') return b.status === 'COMPLETED' || b.status === 'READY';
+    if (filter === 'PENDING') return b.status === 'PENDING' || b.status === 'PENDING_PAYMENT' || b.status === 'CONFIRMED' || b.status === 'CHECKED_IN';
+    if (filter === 'CLEANING') return b.status === 'PROCESSING' || b.status === 'CLEANING';
+    if (filter === 'COMPLETED') return b.status === 'COMPLETED' || b.status === 'READY_FOR_PICKUP' || b.status === 'READY' || b.status === 'REFUNDED';
     return true;
   });
+
+  const getStatusBadge = (status: BookingStatus) => {
+    switch (status) {
+      case 'PENDING_PAYMENT':
+        return <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">Chờ Thanh Toán</span>;
+      case 'CONFIRMED':
+        return <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800">Vé Hẹn Đã Xác Nhận</span>;
+      case 'CHECKED_IN':
+        return <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">Đã Check-in Bàn Trực</span>;
+      case 'PROCESSING':
+      case 'CLEANING':
+        return <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 animate-pulse">Đang Vệ Sinh 30p</span>;
+      case 'READY_FOR_PICKUP':
+      case 'READY':
+        return <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">Mời Test Âm & Lấy Máy</span>;
+      case 'COMPLETED':
+        return <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Đã Hoàn Tất Bàn Giao</span>;
+      case 'REFUNDED':
+        return <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800">Scope Lock (Đã Hoàn 100%)</span>;
+      default:
+        return <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">Chờ Tiếp Nhận</span>;
+    }
+  };
 
   return (
     <div className="pt-20 pb-28 px-4 sm:px-6 max-w-3xl mx-auto space-y-5">
@@ -88,15 +111,7 @@ export const StitchAppointmentList: React.FC<StitchAppointmentListProps> = ({
                   </span>
                 </div>
 
-                <span className={`text-[10px] font-bold px-2.5 py-0.8 rounded-full ${
-                  b.status === 'PENDING'
-                    ? 'bg-amber-100 text-amber-800'
-                    : b.status === 'CLEANING'
-                      ? 'bg-purple-100 text-purple-800 animate-pulse'
-                      : 'bg-emerald-100 text-emerald-800'
-                }`}>
-                  {b.status === 'PENDING' ? 'Chờ Khách Bàn Giao' : b.status === 'CLEANING' ? 'Đang Vệ Sinh 30p' : 'Đã Hoàn Thành'}
-                </span>
+                {getStatusBadge(b.status)}
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">

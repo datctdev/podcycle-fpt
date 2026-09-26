@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS app_users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. BẢNG BOOKINGS (Lịch Hẹn Đặt Vệ Sinh & Hồ Sơ Kiểm Định Âm Học)
+-- 2. BẢNG BOOKINGS (Lịch Hẹn Đặt Vệ Sinh & Hồ Sơ Kiểm Định Âm Học Chuẩn SOP 6 Giai Đoạn)
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   booking_code TEXT NOT NULL UNIQUE,
@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   student_id TEXT,
   campus TEXT NOT NULL,
   device_model TEXT NOT NULL,
+  serial_number TEXT,
   issue_note TEXT,
   service_id TEXT NOT NULL,
   service_name TEXT NOT NULL,
@@ -35,17 +36,44 @@ CREATE TABLE IF NOT EXISTS bookings (
   booking_date DATE NOT NULL,
   slot_time TEXT NOT NULL,
   payment_method TEXT NOT NULL,
-  payment_status TEXT NOT NULL, -- 'PAID', 'UNPAID'
-  status TEXT NOT NULL,         -- 'PENDING', 'CHECKED_IN', 'CLEANING', 'READY', 'COMPLETED', 'CANCELLED'
+  payment_status TEXT NOT NULL, -- 'PAID', 'UNPAID', 'REFUNDED'
+  status TEXT NOT NULL,         -- 'PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'PROCESSING', 'READY_FOR_PICKUP', 'COMPLETED', 'CANCELLED', 'REFUNDED'
   technician_name TEXT,
   sound_clarity_score INTEGER DEFAULT 98,
   before_photo TEXT,
   after_photo TEXT,
+  checklist_before JSONB,
+  checklist_after JSONB,
+  scope_lock_reason TEXT,
+  next_maintenance_date DATE,
+  refund_reason TEXT,
+  refunded_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
 
--- 3. BẢNG SUPPORT_TICKETS (Trung Tâm Liên Hệ & Phản Hồi Sinh Viên)
+-- Bổ sung cột an toàn nếu bảng đã tồn tại
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS serial_number TEXT;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checklist_before JSONB;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checklist_after JSONB;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS scope_lock_reason TEXT;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS next_maintenance_date DATE;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS refund_reason TEXT;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
+
+-- 3. BẢNG TRANSACTIONS (Lịch Sử Giao Dịch Cổng Thanh Toán SePay PG)
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY,
+  booking_id TEXT REFERENCES bookings(id) ON DELETE CASCADE,
+  booking_code TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  payment_method TEXT NOT NULL DEFAULT 'SEPAY_PG',
+  reference_number TEXT,
+  status TEXT NOT NULL DEFAULT 'SUCCESS',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. BẢNG SUPPORT_TICKETS (Trung Tâm Liên Hệ & Phản Hồi Sinh Viên)
 CREATE TABLE IF NOT EXISTS support_tickets (
   id TEXT PRIMARY KEY,
   full_name TEXT NOT NULL,
