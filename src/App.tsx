@@ -1,208 +1,182 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar';
-import { HeroSection } from './components/HeroSection';
-import { ServiceList } from './components/ServiceList';
-import { BookingFlow } from './components/BookingFlow';
-import { StaffDashboard } from './components/StaffDashboard';
+import { TopAppBar } from './components/TopAppBar';
+import { StitchHero } from './components/StitchHero';
+import { StitchBeforeAfter } from './components/StitchBeforeAfter';
+import { StitchSteps } from './components/StitchSteps';
+import { StitchServices } from './components/StitchServices';
+import { StitchPromotion } from './components/StitchPromotion';
+import { StitchBooking } from './components/StitchBooking';
+import { StitchAppointmentDetail } from './components/StitchAppointmentDetail';
+import { StitchAppointmentList } from './components/StitchAppointmentList';
+import { StitchReviewModal } from './components/StitchReviewModal';
+import { BottomNavBar } from './components/BottomNavBar';
 import { AnalyticsInspector } from './components/AnalyticsInspector';
 import { Footer } from './components/Footer';
 import { INITIAL_BOOKINGS } from './data/mockData';
 import { Booking, ServiceItem, BookingStatus } from './types';
 import { trackEvent } from './utils/analytics';
-import { ShieldCheck, Zap, Award, HelpCircle } from 'lucide-react';
 
 export function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'booking' | 'staff'>('home');
+  const [currentTab, setCurrentTab] = useState<'home' | 'booking' | 'appointments' | 'staff' | 'detail'>('home');
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
+  const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
-  // Load bookings from localStorage or mock data
+  // Persistence for bookings
   const [bookings, setBookings] = useState<Booking[]>(() => {
     try {
-      const saved = localStorage.getItem('ttn_bookings');
+      const saved = localStorage.getItem('podcycle_bookings');
       if (saved) return JSON.parse(saved);
     } catch {
-      // Ignore
+      // ignore
     }
     return INITIAL_BOOKINGS;
   });
 
-  // Track initial page_view / first_open
-  useEffect(() => {
-    trackEvent('page_view', {
-      page_title: 'Tiệm Tai Nhỏ - Đặt Lịch Vệ Sinh AirPods FPT',
-      page_location: window.location.href,
-      campus: 'FPT_Campus'
-    });
-  }, []);
-
-  // Save bookings whenever updated
   useEffect(() => {
     try {
-      localStorage.setItem('ttn_bookings', JSON.stringify(bookings));
+      localStorage.setItem('podcycle_bookings', JSON.stringify(bookings));
     } catch {
-      // Ignore
+      // ignore
     }
   }, [bookings]);
 
-  // Handle service selection from home
-  const handleSelectServiceFromHome = (service: ServiceItem) => {
+  // Track initial page_view on load
+  useEffect(() => {
+    trackEvent('page_view', {
+      page_title: 'PODCYCLE - Vệ Sinh Tai Nghe FPT Campus',
+      page_location: window.location.href,
+      theme: 'sonic_purity_system'
+    });
+  }, []);
+
+  // Handlers
+  const handleSelectService = (service: ServiceItem) => {
     setSelectedService(service);
-    setCurrentView('booking');
+    setCurrentTab('booking');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle new booking
   const handleBookingCreated = (newBooking: Booking) => {
     setBookings((prev) => [newBooking, ...prev]);
+    setActiveBooking(newBooking);
+    setCurrentTab('detail');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle staff status update
-  const handleUpdateStatus = (bookingId: string, newStatus: BookingStatus) => {
+  const handleUpdateStatus = (bookingId: string, status: BookingStatus) => {
     setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
+      prev.map((b) => (b.id === bookingId ? { ...b, status } : b))
     );
+    if (activeBooking && activeBooking.id === bookingId) {
+      setActiveBooking((prev) => prev ? { ...prev, status } : null);
+    }
   };
+
+  const activeCount = bookings.filter(
+    (b) => b.status === 'PENDING' || b.status === 'CLEANING'
+  ).length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
+    <div className="min-h-screen flex flex-col bg-[#f8f9ff] text-[#0b1c30]">
       
-      {/* Navigation */}
-      <Navbar
-        currentView={currentView}
-        onNavigate={(view) => {
-          setCurrentView(view);
+      {/* Top App Bar */}
+      <TopAppBar
+        currentTab={currentTab === 'detail' ? 'booking' : currentTab}
+        onSelectTab={(tab) => {
+          setCurrentTab(tab);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        bookingCount={bookings.filter((b) => b.status === 'PENDING' || b.status === 'CLEANING').length}
+        bookingCount={activeCount}
       />
 
-      {/* Main Content Area */}
+      {/* Main Body */}
       <main className="flex-1">
         
-        {/* VIEW 1: HOME */}
-        {currentView === 'home' && (
-          <div>
-            <HeroSection
+        {/* TAB 1: HOME */}
+        {currentTab === 'home' && (
+          <div className="pt-16 pb-24">
+            <StitchHero
               onStartBooking={() => {
-                setCurrentView('booking');
+                setCurrentTab('booking');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
 
-            <ServiceList onSelectService={handleSelectServiceFromHome} />
+            <StitchBeforeAfter />
 
-            {/* O2O Process Section */}
-            <section className="py-16 bg-slate-50 border-b border-slate-200">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center max-w-2xl mx-auto mb-12">
-                  <span className="text-blue-600 font-semibold text-xs uppercase tracking-wider">Quy Trình Tinh Gọn</span>
-                  <h2 className="text-3xl font-bold text-slate-900 mt-2">Mô Hình O2O Khép Kín 4 Bước</h2>
-                  <p className="text-slate-600 text-sm mt-2">
-                    Không mất công di chuyển xa, không sợ bị tráo linh kiện. Mọi thao tác thực hiện trực tiếp tại trường.
-                  </p>
-                </div>
+            <StitchSteps />
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs relative">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-base mb-4">
-                      1
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-base">Đặt Lịch 1 Chạm</h3>
-                    <p className="text-xs text-slate-500 mt-2">
-                      Chọn dòng AirPods, chọn ca rảnh giữa các tiết học và giữ slot real-time trên web.
-                    </p>
-                  </div>
+            <StitchServices onSelectService={handleSelectService} />
 
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs relative">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-base mb-4">
-                      2
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-base">Gửi Máy Tại Sảnh</h3>
-                    <p className="text-xs text-slate-500 mt-2">
-                      Đưa tai nghe cho nhân viên tại bàn trực sảnh tự học campus và nhận mã định danh dán trên dock.
-                    </p>
-                  </div>
-
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs relative">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-base mb-4">
-                      3
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-base">Vệ Sinh 30 Phút</h3>
-                    <p className="text-xs text-slate-500 mt-2">
-                      Rã cặn màng loa bề ngoài, hút bụi hốc sạc và khử khuẩn bằng thiết bị chuyên dụng an toàn tuyệt đối.
-                    </p>
-                  </div>
-
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs relative">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-base mb-4">
-                      4
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-base">Test & Bàn Giao</h3>
-                    <p className="text-xs text-slate-500 mt-2">
-                      Sinh viên nghe thử âm thanh, kiểm tra độ to rõ của loa trước khi thanh toán. Hoàn phí 100% nếu không hài lòng.
-                    </p>
-                  </div>
-
-                </div>
-              </div>
-            </section>
-
-            {/* Commitments & FAQ Section */}
-            <section className="py-16 bg-white">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6">
-                <div className="text-center mb-10">
-                  <h2 className="text-2xl font-bold text-slate-900">Câu Hỏi Thường Gặp Về Dịch Vụ</h2>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <h4 className="font-bold text-slate-900 text-sm">Vệ sinh AirPods có làm ảnh hưởng đến màng loa hay ngấm nước không?</h4>
-                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                      Tuyệt đối không! Tiệm Tai Nhỏ cam kết không đổ bất kỳ chất lỏng trực tiếp nào lên màng loa. Chúng tôi sử dụng đầu tăm gòn vi sinh ẩm dung dịch bốc hơi nhanh chuyên dụng và máy hút chân không vi hạt để tách bụi an toàn.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <h4 className="font-bold text-slate-900 text-sm">Chính sách hoàn phí 100% hoạt động như thế nào?</h4>
-                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                      Nếu sau khi vệ sinh ngoại quan xong mà âm lượng tai nghe của bạn vẫn không to và rõ hơn so với ban đầu (do lỗi phần cứng màng loa bên trong), chúng tôi sẽ hoàn trả lại 100% số tiền dịch vụ cho bạn ngay tại chỗ.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <h4 className="font-bold text-slate-900 text-sm">Bàn trực của nhóm đặt ở đâu tại Campus FPT?</h4>
-                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                      Tại TP.HCM: Bàn số 2 tại sảnh tự học Tòa nhà A (cạnh Canteen). Tại Hà Nội: Sảnh Beta Hall.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
+            <StitchPromotion
+              onClaim={() => {
+                setCurrentTab('booking');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
           </div>
         )}
 
-        {/* VIEW 2: BOOKING */}
-        {currentView === 'booking' && (
-          <BookingFlow
+        {/* TAB 2: BOOKING */}
+        {currentTab === 'booking' && (
+          <StitchBooking
             initialService={selectedService}
-            onBookingCreated={handleBookingCreated}
-            onBackToHome={() => {
-              setCurrentView('home');
+            onBookingSuccess={handleBookingCreated}
+            onBack={() => {
+              setCurrentTab('home');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
         )}
 
-        {/* VIEW 3: STAFF DISPATCH */}
-        {currentView === 'staff' && (
-          <StaffDashboard
+        {/* TAB 3: APPOINTMENT DETAIL (VÉ HẸN) */}
+        {currentTab === 'detail' && activeBooking && (
+          <StitchAppointmentDetail
+            booking={activeBooking}
+            onBack={() => {
+              setCurrentTab('appointments');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenReview={() => setIsReviewOpen(true)}
+          />
+        )}
+
+        {/* TAB 4: MY APPOINTMENTS */}
+        {currentTab === 'appointments' && (
+          <StitchAppointmentList
             bookings={bookings}
+            onSelectBooking={(b) => {
+              setActiveBooking(b);
+              setCurrentTab('detail');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            isStaffMode={false}
+          />
+        )}
+
+        {/* TAB 5: STAFF DISPATCH */}
+        {currentTab === 'staff' && (
+          <StitchAppointmentList
+            bookings={bookings}
+            onSelectBooking={(b) => {
+              setActiveBooking(b);
+              setCurrentTab('detail');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onUpdateStatus={handleUpdateStatus}
+            isStaffMode={true}
           />
         )}
 
       </main>
+
+      {/* Review Modal */}
+      <StitchReviewModal
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        bookingCode={activeBooking?.bookingCode}
+      />
 
       {/* Floating GA4 Live Inspector */}
       <AnalyticsInspector />
@@ -210,7 +184,18 @@ export function App() {
       {/* Footer */}
       <Footer />
 
+      {/* Mobile Bottom Navigation */}
+      <BottomNavBar
+        currentTab={currentTab === 'detail' ? 'booking' : currentTab}
+        onSelectTab={(tab) => {
+          setCurrentTab(tab);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        bookingCount={activeCount}
+      />
+
     </div>
   );
 }
+
 export default App;
