@@ -107,11 +107,11 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
                 1. TRƯỚC VỆ SINH
               </span>
               <img
-                src={booking.beforePhoto || '/clean-airpods.png'}
+                src={booking.beforePhoto || '/before-after.png'}
                 alt="Trước vệ sinh"
                 className="w-full h-28 object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/clean-airpods.png';
+                  (e.target as HTMLImageElement).src = '/before-after.png';
                 }}
               />
             </div>

@@ -25,6 +25,7 @@ import { trackEvent } from './utils/analytics';
 import { DatabaseService, initSupabase } from './services/db';
 import { playStationNotification } from './utils/sound';
 import { redirectToSePayCheckout } from './services/sepay';
+import { App as CapApp } from '@capacitor/app';
 
 // Route wrapper for Appointment Detail with deep-link parameter support
 function AppointmentDetailRoute({
@@ -238,6 +239,36 @@ export function App() {
       // ignore
     }
   }, [currentUser]);
+
+  // Handle Android Hardware / Gesture Back Button in Capacitor APK
+  useEffect(() => {
+    let listenerPromise: any = null;
+    try {
+      listenerPromise = CapApp.addListener('backButton', () => {
+        if (isReceiptOpen) {
+          setIsReceiptOpen(false);
+          return;
+        }
+        if (isReviewOpen) {
+          setIsReviewOpen(false);
+          return;
+        }
+        if (location.pathname !== '/' && location.pathname !== '/tech-workspace') {
+          navigate(-1);
+          return;
+        }
+        CapApp.exitApp();
+      });
+    } catch {
+      // ignore when running outside Capacitor
+    }
+
+    return () => {
+      if (listenerPromise) {
+        listenerPromise.then((handle: any) => handle?.remove?.()).catch(() => {});
+      }
+    };
+  }, [isReceiptOpen, isReviewOpen, location.pathname, navigate]);
 
   // Track page views on location change
   useEffect(() => {

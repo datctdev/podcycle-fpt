@@ -17,7 +17,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   const isTechnician = currentUser?.role === 'TECHNICIAN';
 
   return (
-    <nav className="fixed bottom-0 w-full z-50 bg-[#f8f9ff]/92 backdrop-blur-lg border-t border-slate-200/80 shadow-[0_-2px_12px_rgba(15,23,42,0.06)] h-16 px-2 flex justify-around items-center md:hidden">
+    <nav className="fixed bottom-0 w-full z-50 bg-[#f8f9ff]/92 backdrop-blur-lg border-t border-slate-200/80 shadow-[0_-2px_12px_rgba(15,23,42,0.06)] h-[calc(4.2rem+env(safe-area-inset-bottom,0px))] pb-safe pt-1 px-2 flex justify-around items-center md:hidden">
       {isTechnician ? (
         // MOBILE NAV DÀNH CHO KỸ THUẬT VIÊN
         <>
