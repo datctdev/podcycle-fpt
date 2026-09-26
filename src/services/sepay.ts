@@ -1,18 +1,18 @@
 /**
- * SEPAY PAYMENT GATEWAY & AUTOMATED BANKING SERVICE (SEPAY.VN)
- * 1. Hỗ trợ SePay Payment Gateway (SePay PG): Merchant ID & Secret Key, ký HMAC-SHA256, checkout form URL.
- * 2. Hỗ trợ SePay Direct VietQR Napas 24/7 & Auto-Polling qua SePay API v2.
+ * SEPAY PAYMENT GATEWAY SERVICE (SEPAY.VN)
+ * Cổng thanh toán chuyển khoản và thẻ thông qua bên thứ ba SePay (Production 100%)
+ * Không hardcode STK cá nhân, không sandbox giả lập
  */
 
 import CryptoJS from 'crypto-js';
 
 // ==============================================================
-// 1. CẤU HÌNH SEPAY PAYMENT GATEWAY (MERCHANT ID & SECRET KEY)
+// 1. CẤU HÌNH SEPAY PAYMENT GATEWAY (PRODUCTION)
 // ==============================================================
-export type SePayPgEnv = 'sandbox' | 'production';
+export type SePayPgEnv = 'production';
 
 export interface SePayPgConfig {
-  env: SePayPgEnv;
+  env: 'production';
   merchant_id: string;
   secret_key: string;
 }
@@ -43,13 +43,13 @@ export interface SePayCheckoutFormFields {
 }
 
 export const DEFAULT_SEPAY_PG_CONFIG: SePayPgConfig = {
-  env: 'sandbox',
+  env: 'production',
   merchant_id: '',
   secret_key: ''
 };
 
 /**
- * Lấy cấu hình SePay PG (Merchant ID & Secret Key)
+ * Lấy cấu hình SePay PG (Production) từ Environment Variables hoặc LocalStorage
  */
 export const getSePayPgConfig = (): SePayPgConfig => {
   try {
@@ -57,7 +57,7 @@ export const getSePayPgConfig = (): SePayPgConfig => {
     if (saved) {
       const parsed = JSON.parse(saved);
       return {
-        env: parsed.env || (import.meta.env.VITE_SEPAY_ENV as SePayPgEnv) || 'sandbox',
+        env: (parsed.env as SePayPgEnv) || (import.meta.env.VITE_SEPAY_ENV as SePayPgEnv) || 'production',
         merchant_id: parsed.merchant_id || import.meta.env.VITE_SEPAY_MERCHANT_ID || '',
         secret_key: parsed.secret_key || import.meta.env.VITE_SEPAY_SECRET_KEY || ''
       };
@@ -67,7 +67,7 @@ export const getSePayPgConfig = (): SePayPgConfig => {
   }
 
   return {
-    env: (import.meta.env.VITE_SEPAY_ENV as SePayPgEnv) || 'sandbox',
+    env: (import.meta.env.VITE_SEPAY_ENV as SePayPgEnv) || 'production',
     merchant_id: import.meta.env.VITE_SEPAY_MERCHANT_ID || '',
     secret_key: import.meta.env.VITE_SEPAY_SECRET_KEY || ''
   };
@@ -84,7 +84,7 @@ export const saveSePayPgConfig = (config: Partial<SePayPgConfig>) => {
 };
 
 /**
- * Lớp SePay Payment Gateway Client (Tương thích 100% tài liệu sepay-pg-node)
+ * Lớp SePay Payment Gateway Client chuẩn Production (sepay-pg-node tương thích)
  */
 export class SePayPgClient {
   private config: SePayPgConfig;
@@ -93,18 +93,15 @@ export class SePayPgClient {
     const defaultConfig = getSePayPgConfig();
     this.config = {
       env: config?.env || defaultConfig.env,
-      merchant_id: config?.merchant_id ?? defaultConfig.merchant_id,
-      secret_key: config?.secret_key ?? defaultConfig.secret_key
+      merchant_id: (config?.merchant_id ?? defaultConfig.merchant_id).trim(),
+      secret_key: (config?.secret_key ?? defaultConfig.secret_key).trim()
     };
   }
 
   public get checkout() {
     return {
       initCheckoutUrl: (): string => {
-        const version = 'v1';
-        return this.config.env === 'sandbox'
-          ? `https://pay-sandbox.sepay.vn/${version}/checkout/init`
-          : `https://pay.sepay.vn/${version}/checkout/init`;
+        return 'https://pay.sepay.vn/v1/checkout/init';
       },
 
       initOneTimePaymentFields: (params: OneTimePaymentParams): SePayCheckoutFormFields => {
@@ -133,7 +130,7 @@ export class SePayPgClient {
   }
 
   /**
-   * Ký chữ ký HMAC-SHA256 theo đúng đặc tả của SePay Payment Gateway
+   * Ký chữ ký HMAC-SHA256 chuẩn đặc tả của SePay Payment Gateway
    */
   private signFields(fields: Record<string, any>): string {
     const signedAllowed = [
@@ -171,15 +168,8 @@ export class SePayPgClient {
 }
 
 // ==============================================================
-// 2. CẤU HÌNH SEPAY DIRECT VIETQR & BANKING API V2
+// 2. SEPAY TRANSACTION TRA CỨU & AUTO-POLLING API
 // ==============================================================
-export interface SePayConfig {
-  apiKey: string;
-  accountNo: string;
-  bank: string;
-  accountName: string;
-}
-
 export interface SePayTransaction {
   id: number | string;
   bank_brand_name?: string;
@@ -201,70 +191,16 @@ export interface SePayApiResponse {
   error?: string;
 }
 
-export const DEFAULT_SEPAY_CONFIG: SePayConfig = {
-  apiKey: '',
-  accountNo: '07478087601',
-  bank: 'TPBank',
-  accountName: 'CHAU THANH DAT'
+export const getSePayApiToken = (): string => {
+  return (
+    localStorage.getItem('ttn_sepay_api_key') ||
+    import.meta.env.VITE_SEPAY_API_KEY ||
+    ''
+  ).trim();
 };
 
-export const getSePayConfig = (): SePayConfig => {
-  try {
-    const saved = localStorage.getItem('ttn_sepay_config');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.apiKey || parsed.accountNo) {
-        return {
-          apiKey: parsed.apiKey || import.meta.env.VITE_SEPAY_API_KEY || '',
-          accountNo: parsed.accountNo || import.meta.env.VITE_SEPAY_ACCOUNT_NO || import.meta.env.VITE_VIETQR_ACCOUNT_NO || DEFAULT_SEPAY_CONFIG.accountNo,
-          bank: parsed.bank || import.meta.env.VITE_SEPAY_BANK || import.meta.env.VITE_VIETQR_BANK_ID || DEFAULT_SEPAY_CONFIG.bank,
-          accountName: parsed.accountName || import.meta.env.VITE_SEPAY_ACCOUNT_NAME || import.meta.env.VITE_VIETQR_ACCOUNT_NAME || DEFAULT_SEPAY_CONFIG.accountName
-        };
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  return {
-    apiKey: import.meta.env.VITE_SEPAY_API_KEY || '',
-    accountNo: import.meta.env.VITE_SEPAY_ACCOUNT_NO || import.meta.env.VITE_VIETQR_ACCOUNT_NO || DEFAULT_SEPAY_CONFIG.accountNo,
-    bank: import.meta.env.VITE_SEPAY_BANK || import.meta.env.VITE_VIETQR_BANK_ID || DEFAULT_SEPAY_CONFIG.bank,
-    accountName: import.meta.env.VITE_SEPAY_ACCOUNT_NAME || import.meta.env.VITE_VIETQR_ACCOUNT_NAME || DEFAULT_SEPAY_CONFIG.accountName
-  };
-};
-
-export const saveSePayConfig = (config: Partial<SePayConfig>) => {
-  const current = getSePayConfig();
-  const updated = { ...current, ...config };
-  localStorage.setItem('ttn_sepay_config', JSON.stringify(updated));
-  return updated;
-};
-
-/**
- * Sinh mã thanh toán chuẩn SePay: TTN <code_number>
- */
-export const getTransferSyntax = (bookingCode: string): string => {
-  const rawCode = bookingCode.replace(/^TTN-?/i, '').replace(/[^a-zA-Z0-9]/g, '');
-  return `TTN ${rawCode}`;
-};
-
-/**
- * Sinh URL mã QR động chuẩn SePay
- */
-export const generateSePayQRUrl = (
-  amount: number,
-  bookingCode: string,
-  customConfig?: SePayConfig
-): string => {
-  const cfg = customConfig || getSePayConfig();
-  const cleanBank = encodeURIComponent(cfg.bank.trim());
-  const cleanAcc = encodeURIComponent(cfg.accountNo.trim());
-  const cleanAmount = Math.round(amount);
-  const transferContent = getTransferSyntax(bookingCode);
-  const encodedContent = encodeURIComponent(transferContent);
-
-  return `https://qr.sepay.vn/img?acc=${cleanAcc}&bank=${cleanBank}&amount=${cleanAmount}&des=${encodedContent}&template=compact`;
+export const saveSePayApiToken = (token: string) => {
+  localStorage.setItem('ttn_sepay_api_key', token.trim());
 };
 
 /**
@@ -323,11 +259,11 @@ async function fetchSePayTransactions(token: string, limit = 20): Promise<SePayA
 export const testSePayConnection = async (
   apiKey?: string
 ): Promise<{ success: boolean; message: string }> => {
-  const token = apiKey || getSePayConfig().apiKey;
+  const token = apiKey || getSePayApiToken();
   if (!token) {
     return {
       success: false,
-      message: 'Chưa nhập SePay API Key (Token)!'
+      message: 'Chưa nhập SePay API Key!'
     };
   }
 
@@ -342,7 +278,7 @@ export const testSePayConnection = async (
     if (res.status === 200) {
       return {
         success: true,
-        message: 'Kết nối SePay API v2 thành công! Hệ thống sẵn sàng kiểm tra biến động số dư tự động.'
+        message: 'Kết nối SePay API thành công! Hệ thống sẵn sàng đối soát tự động.'
       };
     }
     return {
@@ -358,7 +294,7 @@ export const testSePayConnection = async (
 };
 
 /**
- * Kiểm tra thanh toán tự động qua SePay API v2
+ * Kiểm tra thanh toán tự động qua SePay API
  */
 export const checkSePayPayment = async (
   bookingCode: string,
@@ -368,16 +304,16 @@ export const checkSePayPayment = async (
   transaction?: SePayTransaction;
   message?: string;
 }> => {
-  const config = getSePayConfig();
-  if (!config.apiKey) {
+  const token = getSePayApiToken();
+  if (!token) {
     return {
       isPaid: false,
-      message: 'Chưa cấu hình SePay API Key trong Cài Đặt hoặc file .env'
+      message: 'Chưa cấu hình SePay API Key để tự động polling.'
     };
   }
 
   try {
-    const res = await fetchSePayTransactions(config.apiKey, 30);
+    const res = await fetchSePayTransactions(token, 30);
     if (res.status !== 200 || !res.transactions || res.transactions.length === 0) {
       return { isPaid: false, message: 'Chưa có biến động số dư nào gần đây.' };
     }
@@ -405,14 +341,14 @@ export const checkSePayPayment = async (
         return {
           isPaid: true,
           transaction: tx,
-          message: `Giao dịch thành công! Nhận ${amountIn.toLocaleString('vi-VN')}đ qua ${tx.bank_brand_name || 'Napas'}`
+          message: `Giao dịch thành công! Nhận ${amountIn.toLocaleString('vi-VN')}đ qua ${tx.bank_brand_name || 'SePay'}`
         };
       }
     }
 
     return {
       isPaid: false,
-      message: 'Đang tiếp tục chờ biến động số dư từ ngân hàng...'
+      message: 'Đang tiếp tục chờ biến động số dư từ SePay...'
     };
   } catch (err: any) {
     return {

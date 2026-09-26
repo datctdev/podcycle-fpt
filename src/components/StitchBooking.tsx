@@ -3,7 +3,6 @@ import { CAMPUSES, SERVICES } from '../services/dataInit';
 import { ServiceItem, DeviceModel, Booking, TimeSlot, User } from '../types';
 import { trackEvent } from '../utils/analytics';
 import { DatabaseService } from '../services/db';
-import { getSePayConfig, generateSePayQRUrl } from '../services/sepay';
 
 interface StitchBookingProps {
   initialService?: ServiceItem | null;
@@ -27,8 +26,6 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
     initialService || SERVICES[0]
   );
 
-  // SePay Configuration for Real VietQR
-  const sepayConfig = getSePayConfig();
 
   // Dates: Next 5 days
   const dateOptions = [

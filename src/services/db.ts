@@ -1,67 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Booking, BookingStatus, User } from '../types';
 
-export interface BankConfig {
-  bankId: string;       // e.g. 'MB', 'VCB', 'TCB', 'TPB', 'ACB', 'BIDV', 'ICB'
-  accountNo: string;    // Số tài khoản thật
-  accountName: string;  // Tên chủ tài khoản không dấu
-  bankName: string;     // Tên hiển thị
-}
-
-export const DEFAULT_BANK_CONFIG: BankConfig = {
-  bankId: 'TPB',
-  accountNo: '07478087601',
-  accountName: 'CHAU THANH DAT',
-  bankName: 'TPBank (Tiên Phong)'
-};
-
-// Available banks in Vietnam
-export const POPULAR_BANKS = [
-  { id: 'MB', name: 'MB Bank (Ngân hàng Quân Đội)' },
-  { id: 'VCB', name: 'Vietcombank (Ngoại Thương)' },
-  { id: 'TCB', name: 'Techcombank (Kỹ Thương)' },
-  { id: 'TPB', name: 'TPBank (Tiên Phong)' },
-  { id: 'ACB', name: 'ACB (Á Châu)' },
-  { id: 'BIDV', name: 'BIDV (Đầu tư & Phát triển)' },
-  { id: 'ICB', name: 'VietinBank (Công Thương)' },
-  { id: 'VPB', name: 'VPBank (Việt Nam Thịnh Vượng)' }
-];
-
-// Load Bank Config from storage or environment variables or default
-export const getBankConfig = (): BankConfig => {
-  try {
-    const saved = localStorage.getItem('ttn_bank_config');
-    if (saved) return JSON.parse(saved);
-  } catch {
-    // ignore
-  }
-  return {
-    bankId: import.meta.env.VITE_VIETQR_BANK_ID || DEFAULT_BANK_CONFIG.bankId,
-    accountNo: import.meta.env.VITE_VIETQR_ACCOUNT_NO || DEFAULT_BANK_CONFIG.accountNo,
-    accountName: import.meta.env.VITE_VIETQR_ACCOUNT_NAME || DEFAULT_BANK_CONFIG.accountName,
-    bankName: import.meta.env.VITE_VIETQR_BANK_NAME || DEFAULT_BANK_CONFIG.bankName
-  };
-};
-
-export const saveBankConfig = (config: BankConfig) => {
-  localStorage.setItem('ttn_bank_config', JSON.stringify(config));
-};
-
-// Generate 100% REAL VietQR Standard Image URL (Napas 247)
-export const generateRealVietQR = (
-  bankConfig: BankConfig,
-  amount: number,
-  bookingCode: string
-): string => {
-  const cleanBank = bankConfig.bankId.trim();
-  const cleanAcc = bankConfig.accountNo.trim();
-  const cleanMemo = encodeURIComponent(`TTN ${bookingCode}`);
-  const cleanName = encodeURIComponent(bankConfig.accountName.trim());
-  
-  // Official VietQR API format
-  return `https://img.vietqr.io/image/${cleanBank}-${cleanAcc}-compact.png?amount=${amount}&addInfo=${cleanMemo}&accountName=${cleanName}`;
-};
-
+// ==============================================================
+// THIẾT LẬP KẾT NỐI SUPABASE CLOUD POSTGRESQL (KHÔNG SỬ DỤNG FALLBACK)
 // ==============================================================
 // THIẾT LẬP KẾT NỐI SUPABASE CLOUD POSTGRESQL (KHÔNG SỬ DỤNG FALLBACK)
 // ==============================================================

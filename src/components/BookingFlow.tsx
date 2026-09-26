@@ -6,7 +6,6 @@ import {
   Calendar, Clock, MapPin, CheckCircle2, QrCode, 
   Smartphone, ArrowRight, ArrowLeft, ShieldAlert, Copy, ExternalLink 
 } from 'lucide-react';
-import { getSePayConfig, generateSePayQRUrl } from '../services/sepay';
 
 interface BookingFlowProps {
   initialService?: ServiceItem | null;
