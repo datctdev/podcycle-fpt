@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CAMPUSES, SERVICES } from '../data/mockData';
+import { CAMPUSES, SERVICES } from '../services/dataInit';
 import { ServiceItem, DeviceModel, Booking, TimeSlot, User } from '../types';
 import { trackEvent } from '../utils/analytics';
 import { 

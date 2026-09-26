@@ -1,5 +1,5 @@
 import React from 'react';
-import { SERVICES } from '../data/mockData';
+import { SERVICES } from '../services/dataInit';
 import { ServiceItem } from '../types';
 import { trackEvent } from '../utils/analytics';
 

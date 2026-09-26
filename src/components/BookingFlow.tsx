@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SERVICES, CAMPUSES, INITIAL_SLOTS } from '../data/mockData';
+import { SERVICES, CAMPUSES, INITIAL_SLOTS } from '../services/dataInit';
 import { ServiceItem, DeviceModel, Booking, TimeSlot } from '../types';
 import { trackEvent } from '../utils/analytics';
 import { 

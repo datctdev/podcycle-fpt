@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Booking, BookingStatus, User } from '../types';
-import { CAMPUSES } from '../data/mockData';
+import { CAMPUSES } from '../services/dataInit';
 import { playStationNotification } from '../utils/sound';
 
 interface TechnicianWorkspaceProps {

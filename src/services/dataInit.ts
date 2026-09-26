@@ -1,6 +1,8 @@
-import { ServiceItem, TimeSlot, Booking } from '../types';
+import { ServiceItem, Booking, User, TimeSlot } from '../types';
+import { hashPassword } from './auth';
 
-export const SERVICES: ServiceItem[] = [
+// 1. Danh mục dịch vụ chuẩn của trạm FPT PODCYCLE
+export const SYSTEM_SERVICES: ServiceItem[] = [
   {
     id: 'deep-clean',
     name: 'Gói Vệ Sinh Chuyên Sâu (Deep Cleaning)',
@@ -45,7 +47,8 @@ export const SERVICES: ServiceItem[] = [
   }
 ];
 
-export const CAMPUSES = [
+// 2. Danh sách cơ sở / Bàn trực tiếp nhận FPT Campus
+export const SYSTEM_CAMPUSES = [
   {
     id: 'fpt-hcm',
     name: 'ĐH FPT TP.HCM (Campus Q.9)',
@@ -62,7 +65,7 @@ export const CAMPUSES = [
 
 export const INITIAL_SLOTS: TimeSlot[] = [
   { id: 's1', time: '08:30 - 09:00', maxCapacity: 3, bookedCount: 1 },
-  { id: 's2', time: '09:15 - 09:45', maxCapacity: 3, bookedCount: 3 }, // Full
+  { id: 's2', time: '09:15 - 09:45', maxCapacity: 3, bookedCount: 3 },
   { id: 's3', time: '10:00 - 10:30', maxCapacity: 3, bookedCount: 2 },
   { id: 's4', time: '11:00 - 11:30', maxCapacity: 3, bookedCount: 0 },
   { id: 's5', time: '13:00 - 13:30', maxCapacity: 3, bookedCount: 1 },
@@ -72,9 +75,13 @@ export const INITIAL_SLOTS: TimeSlot[] = [
   { id: 's9', time: '16:15 - 16:45', maxCapacity: 3, bookedCount: 1 }
 ];
 
-export const INITIAL_BOOKINGS: Booking[] = [
+export const SERVICES = SYSTEM_SERVICES;
+export const CAMPUSES = SYSTEM_CAMPUSES;
+
+// 3. Khởi tạo dữ liệu hệ thống (DataInit) mỗi khi chạy dự án
+export const INITIAL_SEED_BOOKINGS: Booking[] = [
   {
-    id: 'b1',
+    id: 'bk_init_1',
     bookingCode: 'TTN-8821',
     customerName: 'Châu Thành Đạt',
     phone: '0901234567',
@@ -90,10 +97,13 @@ export const INITIAL_BOOKINGS: Booking[] = [
     paymentMethod: 'VIETQR',
     paymentStatus: 'PAID',
     status: 'CLEANING',
+    technicianName: 'Nguyễn Văn Minh (Trưởng ca)',
+    cleaningStartedAt: new Date(Date.now() - 900000).toISOString(),
+    beforePhoto: '/clean-airpods.png',
     createdAt: new Date(Date.now() - 3600000).toISOString()
   },
   {
-    id: 'b2',
+    id: 'bk_init_2',
     bookingCode: 'TTN-8822',
     customerName: 'Trương Lâm Tấn',
     phone: '0912345678',
@@ -112,11 +122,11 @@ export const INITIAL_BOOKINGS: Booking[] = [
     createdAt: new Date(Date.now() - 1800000).toISOString()
   },
   {
-    id: 'b3',
+    id: 'bk_init_3',
     bookingCode: 'TTN-8823',
-    customerName: 'Nguyễn Văn Minh',
-    phone: '0988776655',
-    studentId: 'SE181122',
+    customerName: 'Đoàn Minh Khôi',
+    phone: '0977889900',
+    studentId: 'SE182003',
     campus: 'ĐH FPT TP.HCM (Campus Q.9)',
     deviceModel: 'AirPods Pro 1',
     issueNote: 'Vỏ trầy xước nhiều, loa nhỏ cả 2 bên',
@@ -128,6 +138,68 @@ export const INITIAL_BOOKINGS: Booking[] = [
     paymentMethod: 'VIETQR',
     paymentStatus: 'PAID',
     status: 'READY',
+    technicianName: 'Nguyễn Văn Minh (Trưởng ca)',
+    soundClarityScore: 98,
+    beforePhoto: '/clean-airpods.png',
+    afterPhoto: '/clean-airpods.png',
     createdAt: new Date(Date.now() - 900000).toISOString()
   }
 ];
+
+export async function initProjectData(): Promise<void> {
+  // 1. Khởi tạo tài khoản hệ thống (Nạp mật khẩu đã băm SHA-256)
+  const usersKey = 'ttn_registered_users_db';
+  const existingUsers = localStorage.getItem(usersKey);
+  if (!existingUsers) {
+    const studentPwHash = await hashPassword('123456');
+    const techPwHash = await hashPassword('123456');
+
+    const seedUsers: (User & { passwordHash: string })[] = [
+      {
+        id: 'usr_seed_student',
+        fullName: 'Châu Thành Đạt',
+        email: 'datct.se18@fpt.edu.vn',
+        phone: '0901234567',
+        studentId: 'SE180123',
+        role: 'CUSTOMER',
+        campus: 'ĐH FPT TP.HCM (Campus Q.9)',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+        passwordHash: studentPwHash
+      },
+      {
+        id: 'usr_seed_tech',
+        fullName: 'Nguyễn Văn Minh (Kỹ Thuật Viên Trưởng Ca)',
+        email: 'technician@fpt.edu.vn',
+        phone: '0988776655',
+        studentId: 'TECH-FPT-01',
+        role: 'TECHNICIAN',
+        campus: 'ĐH FPT TP.HCM (Campus Q.9)',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+        passwordHash: techPwHash
+      }
+    ];
+    localStorage.setItem(usersKey, JSON.stringify(seedUsers));
+  }
+
+  // 2. Khởi tạo dữ liệu Đơn hàng nếu chưa có
+  const bookingsKey = 'podcycle_bookings';
+  if (!localStorage.getItem(bookingsKey)) {
+    localStorage.setItem(bookingsKey, JSON.stringify(INITIAL_SEED_BOOKINGS));
+  }
+
+  // 3. Khởi tạo cấu hình Ngân hàng nhận VietQR mặc định nếu chưa có
+  const bankKey = 'ttn_bank_config';
+  if (!localStorage.getItem(bankKey)) {
+    localStorage.setItem(
+      bankKey,
+      JSON.stringify({
+        bankId: 'TP',
+        accountNo: '07478087601',
+        accountName: 'CHAU THANH DAT',
+        bankName: 'TP Bank (Tiên Phong)'
+      })
+    );
+  }
+
+  console.log('[System] DataInit initialized successfully.');
+}

@@ -176,13 +176,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
 
       <div className="relative z-10 w-full max-w-lg">
         
-        {/* Back button */}
+        {/* Back to login button */}
         <button
-          onClick={onBackToHome}
+          onClick={onGoToLogin}
           className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          <span>Về trang chủ</span>
+          <span>Đã có tài khoản? Quay lại Đăng nhập</span>
         </button>
 
         {/* Brand header */}

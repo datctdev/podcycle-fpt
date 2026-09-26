@@ -1,7 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Booking, BookingStatus, User } from '../types';
-import { INITIAL_BOOKINGS } from '../data/mockData';
-import { DEMO_USERS } from '../data/mockUsers';
+import { INITIAL_SEED_BOOKINGS } from './dataInit';
 
 export interface BankConfig {
   bankId: string;       // e.g. 'MB', 'VCB', 'TCB', 'TPB', 'ACB', 'BIDV', 'ICB'
@@ -185,7 +184,7 @@ export const DatabaseService = {
       const local = localStorage.getItem('podcycle_bookings');
       if (local) return JSON.parse(local);
     } catch {}
-    return INITIAL_BOOKINGS;
+    return INITIAL_SEED_BOOKINGS;
   },
 
   // 2. Create new booking

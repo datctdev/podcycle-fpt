@@ -56,28 +56,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-  // Quick Demo fill & trigger real login
-  const handleQuickDemo = async (demoEmail: string, demoPass: string) => {
-    setIdentifier(demoEmail);
-    setPassword(demoPass);
-    setError('');
-    setFieldErrors({});
-    setIsLoading(true);
-
-    try {
-      const result = await AuthService.login(demoEmail, demoPass);
-      setIsLoading(false);
-      if (result.success && result.user) {
-        onLoginSuccess(result.user);
-      } else {
-        setError(result.error || 'Lỗi đăng nhập tài khoản demo.');
-      }
-    } catch (err: any) {
-      setIsLoading(false);
-      setError('Lỗi kết nối máy chủ: ' + err.message);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#f8f9ff] flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden">
       
@@ -87,15 +65,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       {/* Main Container */}
       <div className="relative z-10 w-full max-w-md">
-        
-        {/* Back button */}
-        <button
-          onClick={onBackToHome}
-          className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
-        >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          <span>Về trang chủ</span>
-        </button>
 
         {/* Brand header */}
         <div className="flex flex-col items-center mb-6 text-center">
@@ -104,41 +73,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
           <h1 className="font-heading font-extrabold text-2xl text-[#0b1c30]">PODCYCLE</h1>
           <p className="text-slate-500 text-xs mt-1">Đăng nhập tài khoản sinh viên hoặc kỹ thuật viên</p>
-        </div>
-
-        {/* Quick Demo Switcher Cards (Gọi API thật với tài khoản mẫu) */}
-        <div className="bg-orange-50/80 p-3.5 rounded-2xl border border-orange-200 mb-5 space-y-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#f26f21]">
-            <span className="material-symbols-outlined text-[15px]">bolt</span>
-            <span>ĐĂNG NHẬP NHANH BẰNG TÀI KHOẢN MẪU HỆ THỐNG:</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleQuickDemo('datct.se18@fpt.edu.vn', '123456')}
-              className="bg-white hover:bg-slate-50 border border-orange-200 p-2.5 rounded-xl text-left transition-all active:scale-95 shadow-2xs group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-[#0b1c30]">👨‍🎓 Sinh Viên</span>
-                <span className="material-symbols-outlined text-[14px] text-slate-400 group-hover:text-[#f26f21]">arrow_forward</span>
-              </div>
-              <span className="block text-[10px] text-slate-500 truncate">datct.se18@fpt.edu.vn</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleQuickDemo('technician@fpt.edu.vn', '123456')}
-              className="bg-[#0b1c30] hover:bg-slate-800 text-white p-2.5 rounded-xl text-left transition-all active:scale-95 shadow-xs group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-[#ffb693]">🔧 Kỹ Thuật Viên</span>
-                <span className="material-symbols-outlined text-[14px] text-slate-400 group-hover:text-white">arrow_forward</span>
-              </div>
-              <span className="block text-[10px] text-slate-300 truncate">technician@fpt.edu.vn</span>
-            </button>
-          </div>
         </div>
 
         {/* Form Card */}

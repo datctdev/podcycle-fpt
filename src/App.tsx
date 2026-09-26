@@ -20,12 +20,10 @@ import { TechnicianWorkspace } from './components/TechnicianWorkspace';
 import { DigitalReceiptModal } from './components/DigitalReceiptModal';
 import { SettingsModal } from './components/SettingsModal';
 
-import { INITIAL_BOOKINGS } from './data/mockData';
-import { DEMO_USERS } from './data/mockUsers';
+import { INITIAL_SEED_BOOKINGS } from './services/dataInit';
 import { Booking, ServiceItem, BookingStatus, User } from './types';
 import { trackEvent } from './utils/analytics';
 import { DatabaseService } from './services/db';
-import { AuthService } from './services/auth';
 import { playStationNotification } from './utils/sound';
 
 // Route wrapper for Appointment Detail with deep-link parameter support
@@ -78,12 +76,10 @@ function AppointmentDetailRoute({
 // Guard component for Technician Workspace
 function TechnicianGuardCard({
   currentUser,
-  onLoginTechnician,
   onGoToLogin,
   onGoToHome
 }: {
   currentUser: User | null;
-  onLoginTechnician: () => void;
   onGoToLogin: () => void;
   onGoToHome: () => void;
 }) {
@@ -93,23 +89,17 @@ function TechnicianGuardCard({
         <div className="w-16 h-16 rounded-2xl bg-orange-500/20 text-[#f26f21] flex items-center justify-center mx-auto border border-orange-500/30">
           <span className="material-symbols-outlined text-[32px]">lock_person</span>
         </div>
-        <h2 className="font-heading font-extrabold text-xl">Khu Vực Hạn Chế Kỹ Thuật Viên</h2>
+        <h2 className="font-heading font-extrabold text-xl">Khu Vực Dành Cho Kỹ Thuật Viên</h2>
         <p className="text-xs text-slate-400 leading-relaxed">
-          Bạn hiện đang ở vai trò <strong>{currentUser ? (currentUser.role === 'CUSTOMER' ? 'Sinh Viên' : currentUser.role) : 'Khách vãng lai'}</strong>. Khu vực này chỉ dành riêng cho Kỹ thuật viên trạm PODCYCLE FPT trực tiếp thao tác tiếp nhận và vệ sinh tai nghe.
+          Tài khoản hiện tại của bạn là <strong>{currentUser ? (currentUser.role === 'CUSTOMER' ? 'Sinh Viên' : currentUser.role) : 'Khách vãng lai'}</strong>. Khu vực này chỉ dành riêng cho Kỹ thuật viên trạm PODCYCLE FPT trực tiếp thao tác tiếp nhận và vệ sinh tai nghe.
         </p>
         <div className="pt-2 flex flex-col gap-2.5">
           <button
-            onClick={onLoginTechnician}
+            onClick={onGoToLogin}
             className="w-full fpt-gradient fpt-gradient-hover text-white font-bold text-xs py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
           >
-            <span className="material-symbols-outlined text-[18px]">engineering</span>
-            <span>Đăng nhập nhanh KTV Trưởng (Nguyễn Văn Minh)</span>
-          </button>
-          <button
-            onClick={onGoToLogin}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs py-2.5 rounded-xl border border-slate-700 transition-colors"
-          >
-            Đăng nhập bằng tài khoản KTV khác
+            <span className="material-symbols-outlined text-[18px]">login</span>
+            <span>Đăng nhập tài khoản Kỹ thuật viên</span>
           </button>
           <button
             onClick={onGoToHome}
@@ -135,7 +125,7 @@ export function App() {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Authentication State
+  // Authentication State: Null by default if not stored in localStorage
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const savedUser = localStorage.getItem('podcycle_auth_user');
@@ -143,7 +133,7 @@ export function App() {
     } catch {
       // ignore
     }
-    return DEMO_USERS[0];
+    return null;
   });
 
   // Persistent Bookings State
@@ -154,8 +144,16 @@ export function App() {
     } catch {
       // ignore
     }
-    return INITIAL_BOOKINGS;
+    return INITIAL_SEED_BOOKINGS;
   });
+
+  // MANDATORY AUTH GUARD: Force redirect to /login if not authenticated
+  useEffect(() => {
+    const isAuthRoute = location.pathname.startsWith('/login') || location.pathname.startsWith('/register');
+    if (!currentUser && !isAuthRoute) {
+      navigate('/login', { replace: true });
+    }
+  }, [currentUser, location.pathname]);
 
   // Hydrate from DatabaseService on mount
   useEffect(() => {
@@ -302,55 +300,8 @@ export function App() {
   return (
     <div className="min-h-screen flex flex-col bg-[#f8f9ff] text-[#0b1c30]">
       
-      {/* Quick Role-Switcher Alert Bar for evaluation */}
-      <div className="bg-[#0b1c30] text-slate-300 text-[11px] py-1.5 px-4 flex flex-wrap items-center justify-between border-b border-slate-800 z-50">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
-          <span>Đang đăng nhập: <strong className="text-white">{currentUser ? currentUser.fullName : 'Khách vãng lai'}</strong> ({currentUser?.role === 'TECHNICIAN' ? '🔧 Kỹ Thuật Viên' : '👨‍🎓 Sinh Viên'})</span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-1 text-[#ffb693] hover:text-white bg-slate-800/80 hover:bg-slate-700 px-2 py-0.5 rounded transition-colors text-[11px] border border-slate-700"
-            title="Cấu hình VietQR & Supabase Cloud Database"
-          >
-            <span className="material-symbols-outlined text-[13px] text-[#f26f21]">settings</span>
-            <span>Cấu hình VietQR / Database</span>
-          </button>
-
-          {currentUser?.role === 'TECHNICIAN' ? (
-            <button
-              onClick={() => {
-                setCurrentUser(DEMO_USERS[0]);
-                navigate('/');
-              }}
-              className="text-[#ffb693] hover:underline font-bold"
-            >
-              ⇄ Chuyển sang Sinh Viên (Châu Thành Đạt)
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                setCurrentUser(DEMO_USERS[1]);
-                navigate('/tech-workspace');
-              }}
-              className="text-[#f26f21] hover:underline font-bold"
-            >
-              ⇄ Vào Workspace Kỹ Thuật Viên (Nguyễn Văn Minh)
-            </button>
-          )}
-
-          {currentUser && (
-            <button onClick={handleLogout} className="text-slate-400 hover:text-white">
-              Đăng xuất
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Top App Bar (Only when not in full technician workspace) */}
-      {!isTechWorkspace && (
+      {/* Top App Bar (Only when logged in and not in full technician workspace) */}
+      {!isTechWorkspace && !isAuthPage && (
         <TopAppBar
           currentTab={currentTab}
           currentUser={currentUser}
@@ -363,85 +314,21 @@ export function App() {
       {/* Main Body with Real React Router */}
       <main className="flex-1">
         <Routes>
-          {/* HOME ROUTE */}
-          <Route
-            path="/"
-            element={
-              <div className="pt-16 pb-24">
-                <StitchHero onStartBooking={() => navigate('/booking')} />
-                <StitchBeforeAfter />
-                <StitchSteps />
-                <StitchServices onSelectService={handleSelectService} />
-                <StitchPromotion onClaim={() => navigate('/booking')} />
-              </div>
-            }
-          />
-
-          {/* BOOKING ROUTE */}
-          <Route
-            path="/booking"
-            element={
-              <StitchBooking
-                initialService={selectedService}
-                currentUser={currentUser}
-                allBookings={bookings}
-                onBookingSuccess={handleBookingCreated}
-                onBack={() => navigate('/')}
-              />
-            }
-          />
-
-          {/* APPOINTMENTS LIST ROUTE */}
-          <Route
-            path="/appointments"
-            element={
-              <StitchAppointmentList
-                bookings={customerBookings}
-                onSelectBooking={(b) => {
-                  setActiveBooking(b);
-                  navigate(`/detail/${b.bookingCode}`);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                isStaffMode={false}
-              />
-            }
-          />
-
-          {/* APPOINTMENT DETAIL DEEP-LINK ROUTE */}
-          <Route
-            path="/detail"
-            element={
-              <AppointmentDetailRoute
-                bookings={bookings}
-                activeBooking={activeBooking}
-                onBack={() => navigate('/appointments')}
-                onOpenReview={() => setIsReviewOpen(true)}
-                onConfirmPayment={handleConfirmPayment}
-              />
-            }
-          />
-          <Route
-            path="/detail/:bookingCode"
-            element={
-              <AppointmentDetailRoute
-                bookings={bookings}
-                activeBooking={activeBooking}
-                onBack={() => navigate('/appointments')}
-                onOpenReview={() => setIsReviewOpen(true)}
-                onConfirmPayment={handleConfirmPayment}
-              />
-            }
-          />
-
           {/* AUTH: LOGIN */}
           <Route
             path="/login"
             element={
-              <LoginPage
-                onLoginSuccess={handleLoginSuccess}
-                onGoToRegister={() => navigate('/register')}
-                onBackToHome={() => navigate('/')}
-              />
+              currentUser ? (
+                <Navigate to={currentUser.role === 'TECHNICIAN' ? '/tech-workspace' : '/'} replace />
+              ) : (
+                <LoginPage
+                  onLoginSuccess={handleLoginSuccess}
+                  onGoToRegister={() => navigate('/register')}
+                  onBackToHome={() => {
+                    if (currentUser) navigate('/');
+                  }}
+                />
+              )
             }
           />
 
@@ -449,15 +336,111 @@ export function App() {
           <Route
             path="/register"
             element={
-              <RegisterPage
-                onRegisterSuccess={handleRegisterSuccess}
-                onGoToLogin={() => navigate('/login')}
-                onBackToHome={() => navigate('/')}
-              />
+              currentUser ? (
+                <Navigate to={currentUser.role === 'TECHNICIAN' ? '/tech-workspace' : '/'} replace />
+              ) : (
+                <RegisterPage
+                  onRegisterSuccess={handleRegisterSuccess}
+                  onGoToLogin={() => navigate('/login')}
+                  onBackToHome={() => {
+                    if (currentUser) navigate('/');
+                  }}
+                />
+              )
             }
           />
 
-          {/* PROFILE ROUTE */}
+          {/* HOME ROUTE (Protected) */}
+          <Route
+            path="/"
+            element={
+              currentUser ? (
+                <div className="pt-16 pb-24">
+                  <StitchHero onStartBooking={() => navigate('/booking')} />
+                  <StitchBeforeAfter />
+                  <StitchSteps />
+                  <StitchServices onSelectService={handleSelectService} />
+                  <StitchPromotion onClaim={() => navigate('/booking')} />
+                </div>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          {/* BOOKING ROUTE (Protected) */}
+          <Route
+            path="/booking"
+            element={
+              currentUser ? (
+                <StitchBooking
+                  initialService={selectedService}
+                  currentUser={currentUser}
+                  allBookings={bookings}
+                  onBookingSuccess={handleBookingCreated}
+                  onBack={() => navigate('/')}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          {/* APPOINTMENTS LIST ROUTE (Protected) */}
+          <Route
+            path="/appointments"
+            element={
+              currentUser ? (
+                <StitchAppointmentList
+                  bookings={customerBookings}
+                  onSelectBooking={(b) => {
+                    setActiveBooking(b);
+                    navigate(`/detail/${b.bookingCode}`);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  isStaffMode={false}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          {/* APPOINTMENT DETAIL DEEP-LINK ROUTE (Protected) */}
+          <Route
+            path="/detail"
+            element={
+              currentUser ? (
+                <AppointmentDetailRoute
+                  bookings={bookings}
+                  activeBooking={activeBooking}
+                  onBack={() => navigate('/appointments')}
+                  onOpenReview={() => setIsReviewOpen(true)}
+                  onConfirmPayment={handleConfirmPayment}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/detail/:bookingCode"
+            element={
+              currentUser ? (
+                <AppointmentDetailRoute
+                  bookings={bookings}
+                  activeBooking={activeBooking}
+                  onBack={() => navigate('/appointments')}
+                  onOpenReview={() => setIsReviewOpen(true)}
+                  onConfirmPayment={handleConfirmPayment}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          {/* PROFILE ROUTE (Protected) */}
           <Route
             path="/profile"
             element={
@@ -474,7 +457,7 @@ export function App() {
             }
           />
 
-          {/* TECHNICIAN WORKSPACE WITH RBAC */}
+          {/* TECHNICIAN WORKSPACE WITH STRICT RBAC */}
           <Route
             path="/tech-workspace"
             element={
@@ -491,10 +474,6 @@ export function App() {
               ) : (
                 <TechnicianGuardCard
                   currentUser={currentUser}
-                  onLoginTechnician={async () => {
-                    const res = await AuthService.login('technician@fpt.edu.vn', '123456');
-                    if (res.user) handleLoginSuccess(res.user);
-                  }}
                   onGoToLogin={() => navigate('/login')}
                   onGoToHome={() => navigate('/')}
                 />
@@ -503,7 +482,7 @@ export function App() {
           />
 
           {/* WILDCARD FALLBACK */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to={currentUser ? "/" : "/login"} replace />} />
         </Routes>
       </main>
 

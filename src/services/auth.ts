@@ -1,5 +1,4 @@
 import { User, UserRole } from '../types';
-import { DEMO_USERS } from '../data/mockUsers';
 import { initSupabase } from './db';
 
 export interface RegisterPayload {
@@ -130,20 +129,7 @@ function getLocalUsers(): (User & { passwordHash: string })[] {
   } catch (err) {
     console.warn('Cannot read local users', err);
   }
-  // Khởi tạo các tài khoản demo chuẩn với password 123456
-  const initial = DEMO_USERS.map(u => ({
-    id: u.id,
-    fullName: u.fullName,
-    email: u.email,
-    phone: u.phone,
-    studentId: u.studentId,
-    role: u.role,
-    campus: u.campus,
-    avatar: u.avatar,
-    passwordHash: '123456'
-  }));
-  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(initial));
-  return initial;
+  return [];
 }
 
 function saveLocalUsers(users: (User & { passwordHash: string })[]) {
