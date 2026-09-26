@@ -180,6 +180,12 @@ export const AuthService = {
         .maybeSingle();
 
       if (checkErr) {
+        if (checkErr.message?.includes('schema cache') || checkErr.code === 'PGRST205' || (checkErr as any).code === '42P01') {
+          return {
+            success: false,
+            error: `[Database Chưa Tạo Bảng] Dự án Supabase của bạn chưa có bảng 'app_users'! Vui lòng mở Supabase Dashboard -> SQL Editor -> Dán file supabase_schema.sql và bấm RUN.`
+          };
+        }
         return {
           success: false,
           error: `[Database Error] Không thể kiểm tra tài khoản: ${checkErr.message}`
@@ -281,6 +287,12 @@ export const AuthService = {
         .maybeSingle();
 
       if (queryErr) {
+        if (queryErr.message?.includes('schema cache') || queryErr.code === 'PGRST205' || (queryErr as any).code === '42P01') {
+          return {
+            success: false,
+            error: `[Database Chưa Tạo Bảng] Dự án Supabase của bạn chưa có bảng 'app_users'! Vui lòng mở Supabase Dashboard -> SQL Editor -> Dán file supabase_schema.sql và bấm RUN.`
+          };
+        }
         return {
           success: false,
           error: `[Database Error] Không thể truy vấn người dùng: ${queryErr.message}`

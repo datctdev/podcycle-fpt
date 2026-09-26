@@ -128,6 +128,12 @@ export const DatabaseService = {
       const sb = initSupabase();
       const { error } = await sb.from('bookings').select('id').limit(1);
       if (error) {
+        if (error.message?.includes('schema cache') || error.code === 'PGRST205' || (error as any).code === '42P01') {
+          return {
+            connected: false,
+            error: "Dự án Supabase chưa có bảng 'bookings' hay 'app_users'. Vui lòng mở Supabase SQL Editor và chạy file supabase_schema.sql!"
+          };
+        }
         return { connected: false, error: error.message };
       }
       return { connected: true, latencyMs: Date.now() - startTime };
@@ -149,6 +155,9 @@ export const DatabaseService = {
 
     if (error) {
       console.error('[Database Error] getBookings failed:', error);
+      if (error.message?.includes('schema cache') || error.code === 'PGRST205' || (error as any).code === '42P01') {
+        throw new Error(`[Database Chưa Tạo Bảng] Bảng 'bookings' chưa được tạo trên Supabase. Vui lòng vào Supabase SQL Editor chạy file supabase_schema.sql!`);
+      }
       throw new Error(`[Database Error] Không thể tải dữ liệu từ PostgreSQL: ${error.message}`);
     }
 
