@@ -287,8 +287,44 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
     playStationNotification('complete');
   };
 
-  // Upload photo handler
-  const handleUploadPhoto = (
+  // Helper nén ảnh bằng HTML5 Canvas xuống < 150KB trước khi lưu vào Database
+  const compressImageFile = (file: File, maxDim = 1000, quality = 0.75): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(event.target?.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(event.target?.result as string);
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Upload photo handler với tính năng tự động nén ảnh chống tràn Database
+  const handleUploadPhoto = async (
     bookingId: string,
     photoType: 'beforePhoto' | 'afterPhoto',
     e: React.ChangeEvent<HTMLInputElement>,
@@ -296,18 +332,14 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
   ) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        if (setter) {
-          setter(base64);
-        } else {
-          onUpdateStatus(bookingId, bookings.find((b) => b.id === bookingId)?.status || 'PROCESSING', {
-            [photoType]: base64
-          });
-        }
-      };
-      reader.readAsDataURL(file);
+      const compressedBase64 = await compressImageFile(file);
+      if (setter) {
+        setter(compressedBase64);
+      } else {
+        onUpdateStatus(bookingId, bookings.find((b) => b.id === bookingId)?.status || 'PROCESSING', {
+          [photoType]: compressedBase64
+        });
+      }
     }
   };
 

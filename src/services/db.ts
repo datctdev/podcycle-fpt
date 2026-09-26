@@ -399,13 +399,27 @@ export const DatabaseService = {
     const MAX_PER_SLOT = 3;
 
     return defaultSlots.map((time, idx) => {
-      const realBookedCount = allBookings.filter(
-        (b) =>
-          b.bookingDate === date &&
-          b.campus === campusName &&
-          b.slotTime === time &&
-          b.status !== 'CANCELLED'
-      ).length;
+      const realBookedCount = allBookings.filter((b) => {
+        if (b.bookingDate !== date || b.campus !== campusName || b.slotTime !== time) {
+          return false;
+        }
+        if (b.status === 'CANCELLED' || b.status === 'REFUNDED') {
+          return false;
+        }
+        // Cơ chế TTL 15 phút: Nếu đơn PENDING_PAYMENT / PENDING chưa thanh toán quá 15 phút thì tự động nhả slot
+        if ((b.status === 'PENDING_PAYMENT' || b.status === 'PENDING') && b.paymentStatus === 'UNPAID') {
+          try {
+            const createdAtTime = new Date(b.createdAt).getTime();
+            const diffMinutes = (Date.now() - createdAtTime) / (1000 * 60);
+            if (diffMinutes > 15) {
+              return false; // Quá 15 phút không thanh toán -> Không chiếm slot
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return true;
+      }).length;
 
       return {
         id: `slot_${idx + 1}`,

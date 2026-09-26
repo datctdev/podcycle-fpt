@@ -27,15 +27,39 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
   );
 
 
-  // Dates: Next 5 days
-  const dateOptions = [
-    { label: 'Hôm nay', date: '2026-09-27', day: 'T7' },
-    { label: 'Ngày mai', date: '2026-09-28', day: 'CN' },
-    { label: '29/09', date: '2026-09-29', day: 'T2' },
-    { label: '30/09', date: '2026-09-30', day: 'T3' },
-    { label: '01/10', date: '2026-10-01', day: 'T4' }
-  ];
-  const [selectedDate, setSelectedDate] = useState<string>(dateOptions[0].date);
+  // Dates: Tự động sinh động 5 ngày kế tiếp tính từ hôm nay
+  const dateOptions = React.useMemo(() => {
+    const daysOfWeek = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const options = [];
+    const now = new Date();
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const dayLabel = daysOfWeek[d.getDay()];
+      let label = `${dd}/${mm}`;
+      if (i === 0) label = 'Hôm nay';
+      else if (i === 1) label = 'Ngày mai';
+
+      options.push({
+        label,
+        date: dateStr,
+        day: dayLabel
+      });
+    }
+    return options;
+  }, []);
+
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   const campusObj = CAMPUSES.find((c) => c.id === selectedCampus);
 

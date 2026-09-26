@@ -95,18 +95,30 @@ export default async function handler(req: any, res: any) {
     const b = updatedBookings[0];
     console.log(`[SePay Webhook] ✅ Đã kích hoạt thành công đơn hàng ${b.booking_code}!`);
 
-    // 4. Ghi nhận giao dịch vào bảng transactions
-    const amount = payload.transferAmount || payload.order_amount || payload.amount_in || b.amount;
-    const txId = 'tx_' + (payload.id || Date.now());
-    await sb.from('transactions').insert([{
-      id: txId,
-      booking_id: b.id,
-      booking_code: b.booking_code,
-      amount: Number(amount),
-      payment_method: 'SEPAY_PG',
-      reference_number: String(payload.id || payload.referenceCode || payload.reference_number || 'IPN_VERCEL'),
-      status: 'SUCCESS'
-    }]);
+    // 4. Ghi nhận giao dịch vào bảng transactions (Idempotency chống trùng lặp khi SePay retry)
+    const refNum = String(payload.id || payload.referenceCode || payload.reference_number || 'IPN_VERCEL');
+    const { data: existingTx } = await sb
+      .from('transactions')
+      .select('id')
+      .eq('booking_id', b.id)
+      .eq('reference_number', refNum)
+      .limit(1);
+
+    if (!existingTx || existingTx.length === 0) {
+      const amount = payload.transferAmount || payload.order_amount || payload.amount_in || b.amount;
+      const txId = 'tx_' + (payload.id || Date.now());
+      await sb.from('transactions').insert([{
+        id: txId,
+        booking_id: b.id,
+        booking_code: b.booking_code,
+        amount: Number(amount),
+        payment_method: 'SEPAY_PG',
+        reference_number: refNum,
+        status: 'SUCCESS'
+      }]);
+    } else {
+      console.log(`[SePay Webhook] Giao dịch tham chiếu ${refNum} đã tồn tại trong hệ thống, bỏ qua ghi trùng.`);
+    }
 
     return res.status(200).json({
       success: true,

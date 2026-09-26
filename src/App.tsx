@@ -23,7 +23,7 @@ import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 
 import { Booking, ServiceItem, BookingStatus, User } from './types';
 import { trackEvent } from './utils/analytics';
-import { DatabaseService } from './services/db';
+import { DatabaseService, initSupabase } from './services/db';
 import { playStationNotification } from './utils/sound';
 import { redirectToSePayCheckout } from './services/sepay';
 
@@ -171,9 +171,10 @@ export function App() {
   const [dbStatus, setDbStatus] = useState<'CONNECTING' | 'CONNECTED' | 'ERROR'>('CONNECTING');
   const [dbErrorMessage, setDbErrorMessage] = useState<string>('');
 
-  // MANDATORY AUTH GUARD: Force redirect to /login if not authenticated (except public routes)
+  // AUTH GUARD: Cho phép truy cập Public Trang chủ ('/'), Đăng nhập, Đăng ký, Liên hệ, Chính sách
   useEffect(() => {
     const isPublicRoute =
+      location.pathname === '/' ||
       location.pathname.startsWith('/login') ||
       location.pathname.startsWith('/register') ||
       location.pathname.startsWith('/contact') ||
@@ -199,9 +200,32 @@ export function App() {
       });
   };
 
-  // Hydrate directly from Database on mount
+  // Hydrate directly from Database on mount & Setup Supabase Realtime synchronization
   useEffect(() => {
     refreshBookingsFromDatabase();
+
+    // Lắng nghe biến động Realtime từ bảng bookings (Tự động cập nhật không cần F5)
+    try {
+      const sb = initSupabase();
+      const channel = sb
+        .channel('realtime_bookings_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bookings' },
+          () => {
+            DatabaseService.getBookings()
+              .then((fetched) => setBookings(fetched))
+              .catch(() => {});
+          }
+        )
+        .subscribe();
+
+      return () => {
+        sb.removeChannel(channel);
+      };
+    } catch (err) {
+      console.warn('[Realtime Subscription Warning]', err);
+    }
   }, []);
 
   useEffect(() => {
@@ -244,8 +268,13 @@ export function App() {
   const currentTab = getTabFromPath(location.pathname);
 
   const handleSelectTab = (tab: string) => {
-    if (tab === 'home') navigate('/');
-    else navigate(`/${tab}`);
+    if (tab === 'home') {
+      navigate('/');
+    } else if (!currentUser && (tab === 'booking' || tab === 'appointments' || tab === 'profile')) {
+      navigate('/login');
+    } else {
+      navigate(`/${tab}`);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -422,21 +451,20 @@ export function App() {
             }
           />
 
-          {/* HOME ROUTE (Protected) */}
+          {/* HOME ROUTE (Public - Khách vãng lai xem thoải mái) */}
           <Route
             path="/"
             element={
-              currentUser ? (
-                <div className="pt-16 pb-24">
-                  <StitchHero onStartBooking={() => navigate('/booking')} />
-                  <StitchBeforeAfter />
-                  <StitchSteps />
-                  <StitchServices onSelectService={handleSelectService} />
-                  <StitchPromotion onClaim={() => navigate('/booking')} />
-                </div>
-              ) : (
-                <Navigate to="/login" replace />
-              )
+              <div className="pt-16 pb-24">
+                <StitchHero onStartBooking={() => navigate(currentUser ? '/booking' : '/login')} />
+                <StitchBeforeAfter />
+                <StitchSteps />
+                <StitchServices onSelectService={(service) => {
+                  setSelectedService(service);
+                  navigate(currentUser ? '/booking' : '/login');
+                }} />
+                <StitchPromotion onClaim={() => navigate(currentUser ? '/booking' : '/login')} />
+              </div>
             }
           />
 
