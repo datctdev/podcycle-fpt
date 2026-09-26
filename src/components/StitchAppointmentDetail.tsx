@@ -7,7 +7,9 @@ import {
   generateSePayQRUrl, 
   checkSePayPayment, 
   getTransferSyntax, 
-  SePayTransaction 
+  SePayTransaction,
+  SePayPgClient,
+  getSePayPgConfig
 } from '../services/sepay';
 
 interface StitchAppointmentDetailProps {
@@ -26,6 +28,9 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
   onOpenSettings
 }) => {
   const sepayConfig = getSePayConfig();
+  const pgConfig = getSePayPgConfig();
+  const hasPgConfig = Boolean(pgConfig.merchant_id && pgConfig.secret_key);
+
   const [isManualChecking, setIsManualChecking] = useState(false);
   const [isAutoPolling, setIsAutoPolling] = useState(false);
   const [paymentSuccessNotice, setPaymentSuccessNotice] = useState(booking.paymentStatus === 'PAID');
@@ -36,6 +41,20 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
   const transferSyntax = getTransferSyntax(booking.bookingCode);
   const qrUrl = generateSePayQRUrl(booking.amount, booking.bookingCode, sepayConfig);
 
+  // Khởi tạo SePay Payment Gateway Form Fields (theo đúng mẫu SePay cung cấp)
+  const pgClient = new SePayPgClient(pgConfig);
+  const checkoutURL = pgClient.checkout.initCheckoutUrl();
+  const checkoutFormfields = hasPgConfig ? pgClient.checkout.initOneTimePaymentFields({
+    payment_method: 'BANK_TRANSFER',
+    order_invoice_number: booking.bookingCode,
+    order_amount: booking.amount,
+    currency: 'VND',
+    order_description: `Thanh toan don hang ${booking.bookingCode}`,
+    success_url: `${window.location.origin}/detail/${booking.bookingCode}?payment=success`,
+    error_url: `${window.location.origin}/detail/${booking.bookingCode}?payment=error`,
+    cancel_url: `${window.location.origin}/detail/${booking.bookingCode}?payment=cancel`,
+  }) : null;
+
   // Copy to clipboard helper
   const handleCopy = (key: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -43,12 +62,29 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  // 1. AUTO-POLLING SEPAY API V2: Kiểm tra tự động mỗi 3.5 giây khi chưa thanh toán
+  // 1. Tự động kiểm tra callback từ SePay Payment Gateway (URL có ?payment=success)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success' && booking.paymentStatus !== 'PAID' && !paymentSuccessNotice) {
+      setPaymentSuccessNotice(true);
+      playStationNotification('complete');
+      if (onConfirmPayment) {
+        onConfirmPayment(booking.id);
+      }
+      trackEvent('purchase', {
+        transaction_id: booking.bookingCode,
+        value: booking.amount,
+        currency: 'VND',
+        payment_type: 'SEPAY_GATEWAY_SUCCESS'
+      });
+    }
+  }, [booking.id, booking.bookingCode, booking.amount, booking.paymentStatus, paymentSuccessNotice]);
+
+  // 2. AUTO-POLLING SEPAY API V2: Kiểm tra tự động mỗi 3.5 giây khi chưa thanh toán
   useEffect(() => {
     if (booking.paymentStatus === 'PAID' || paymentSuccessNotice) return;
     if (booking.paymentMethod !== 'VIETQR') return;
     if (!sepayConfig.apiKey) {
-      setCheckStatusMessage('Chưa có SePay API Token. Vui lòng bấm vào icon Bánh răng Cài đặt để kết nối SePay.');
       return;
     }
 
@@ -87,14 +123,12 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
         if (isMounted) setIsAutoPolling(false);
       }
 
-      // Lên lịch lần tiếp theo
       if (isMounted && !paymentSuccessNotice && booking.paymentStatus !== 'PAID') {
         pollTimer = setTimeout(poll, 3500);
       }
     };
 
-    // Chạy lần đầu sau 1 giây
-    pollTimer = setTimeout(poll, 1000);
+    pollTimer = setTimeout(poll, 1500);
 
     return () => {
       isMounted = false;
@@ -102,16 +136,16 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
     };
   }, [booking.id, booking.paymentStatus, booking.bookingCode, booking.amount, booking.paymentMethod, paymentSuccessNotice, sepayConfig.apiKey]);
 
-  // 2. Nút kiểm tra thủ công SePay
+  // 3. Nút kiểm tra thủ công SePay
   const handleManualCheckPayment = async () => {
-    if (!sepayConfig.apiKey) {
-      setCheckStatusMessage('Chưa cấu hình SePay API Key! Vui lòng mở Cài đặt để thêm Token.');
+    if (!sepayConfig.apiKey && !hasPgConfig) {
+      setCheckStatusMessage('Chưa cấu hình SePay API Key hoặc Merchant ID! Vui lòng bấm vào icon Bánh Răng để thêm cấu hình.');
       if (onOpenSettings) onOpenSettings();
       return;
     }
 
     setIsManualChecking(true);
-    setCheckStatusMessage('Đang kết nối SePay API v2 rà soát sao kê ngân hàng...');
+    setCheckStatusMessage('Đang kết nối SePay rà soát biến động số dư ngân hàng...');
 
     try {
       const res = await checkSePayPayment(booking.bookingCode, booking.amount);
@@ -247,7 +281,7 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
         </div>
       </div>
 
-      {/* 4. REAL SEPAY AUTOMATED PAYMENT SECTION */}
+      {/* 4. REAL SEPAY AUTOMATED PAYMENT SECTION (MÃ QR ĐƯỢC TẠO SAU KHI ĐẶT LỊCH) */}
       {booking.paymentMethod === 'VIETQR' && (
         <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-200/90 space-y-4">
           
@@ -257,9 +291,9 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
               <span className="material-symbols-outlined text-[#f26f21] text-[20px]">qr_code_scanner</span>
               <div>
                 <h3 className="font-heading font-bold text-sm text-[#0b1c30]">
-                  Cổng Thanh Toán Tự Động SePay
+                  Cổng Thanh Toán SePay (Đã Kích Hoạt Cho Đơn Hàng)
                 </h3>
-                <span className="text-[10px] text-slate-400">Chuẩn VietQR Napas 24/7 Toàn Quốc</span>
+                <span className="text-[10px] text-slate-400">Mã QR động tạo riêng cho đơn {booking.bookingCode}</span>
               </div>
             </div>
 
@@ -271,7 +305,7 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
             ) : (
               <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-amber-300">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-                <span>CHỜ QUÉT MÃ</span>
+                <span>CHỜ QUÉT MÃ QR</span>
               </span>
             )}
           </div>
@@ -280,10 +314,10 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
           {!isPaid ? (
             <div className="space-y-4">
               
-              {/* QR Image + Account Details */}
+              {/* CÁCH 1: QUÉT MÃ QR ĐỘNG SEPAY NAPAS 24/7 TẠI CHỖ */}
               <div className="flex flex-col sm:flex-row items-center gap-4 bg-orange-50/70 p-4 rounded-2xl border border-orange-200">
                 
-                {/* QR Code */}
+                {/* QR Code động cho đơn hàng này */}
                 <div className="bg-white p-2.5 rounded-2xl shadow-xs border border-slate-200 shrink-0 flex flex-col items-center">
                   <img
                     src={qrUrl}
@@ -298,7 +332,7 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
                   
                   {/* Ngân hàng */}
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Ngân hàng:</span>
+                    <span className="text-slate-500">Ngân hàng nhận:</span>
                     <strong className="text-[#0b1c30]">{sepayConfig.bank}</strong>
                   </div>
 
@@ -364,17 +398,50 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
                 </div>
               </div>
 
+              {/* CÁCH 2: FORM POST CỔNG THANH TOÁN SEPAY PAYMENT GATEWAY (MERCHANT ID & SECRET KEY) */}
+              {hasPgConfig && checkoutFormfields && (
+                <div className="bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-blue-950 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-blue-600 text-[18px]">verified</span>
+                      <span>Hoặc Thanh Toán Qua Cổng SePay Payment Gateway:</span>
+                    </span>
+                    <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
+                      {pgConfig.env.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <form action={checkoutURL} method="POST" target="_blank" className="w-full">
+                    {Object.keys(checkoutFormfields).map((field) => (
+                      <input
+                        key={field}
+                        type="hidden"
+                        name={field}
+                        value={checkoutFormfields[field]}
+                      />
+                    ))}
+                    <button
+                      type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+                    >
+                      <span className="material-symbols-outlined text-[17px]">open_in_new</span>
+                      <span>Mở Cổng Thanh Toán SePay (Pay Now)</span>
+                    </button>
+                  </form>
+                </div>
+              )}
+
               {/* Realtime Auto-Polling Pulse Indicator */}
               <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${isAutoPolling ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`}></span>
                   <span>
                     {isAutoPolling
-                      ? 'SePay API đang rà soát biến động số dư tự động (mỗi 3 giây)...'
+                      ? 'SePay đang rà soát biến động số dư ngân hàng tự động...'
                       : 'Hệ thống tự động phát hiện khi tài khoản nhận được tiền'}
                   </span>
                 </div>
-                {!sepayConfig.apiKey && onOpenSettings && (
+                {onOpenSettings && (
                   <button
                     onClick={onOpenSettings}
                     className="text-[#f26f21] hover:underline font-bold text-[10px]"
@@ -401,7 +468,7 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
                 {isManualChecking ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>Đang gọi SePay API v2 đối soát sao kê...</span>
+                    <span>Đang gọi SePay API đối soát sao kê...</span>
                   </>
                 ) : (
                   <>

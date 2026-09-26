@@ -11,7 +11,10 @@ import {
   getSePayConfig, 
   saveSePayConfig, 
   testSePayConnection, 
-  SePayConfig 
+  SePayConfig,
+  getSePayPgConfig,
+  saveSePayPgConfig,
+  SePayPgConfig 
 } from '../services/sepay';
 
 interface SettingsModalProps {
@@ -24,6 +27,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const [bankConfig, setBankConfig] = useState<BankConfig>(getBankConfig());
   const [supabaseUrl, setSupabaseUrl] = useState(getSupabaseConfig().url);
   const [supabaseKey, setSupabaseKey] = useState(getSupabaseConfig().key);
+  const [sepayPgConfig, setSepayPgConfigState] = useState<SePayPgConfig>(getSePayPgConfig());
   const [sepayConfig, setSepayConfigState] = useState<SePayConfig>(getSePayConfig());
   const [testingSepay, setTestingSepay] = useState(false);
   const [sepayTestResult, setSepayTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -49,6 +53,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     e.preventDefault();
     saveBankConfig(bankConfig);
     saveSePayConfig(sepayConfig);
+    saveSePayPgConfig(sepayPgConfig);
     if (supabaseUrl) localStorage.setItem('ttn_supabase_url', supabaseUrl.trim());
     if (supabaseKey) localStorage.setItem('ttn_supabase_key', supabaseKey.trim());
     setSavedSuccess(true);
@@ -192,37 +197,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             </div>
           </div>
 
-          {/* SECTION 3: SEPAY AUTOMATED PAYMENT API CONFIG */}
+          {/* SECTION 3: SEPAY PAYMENT GATEWAY (MERCHANT ID & SECRET KEY) */}
+          <div className="space-y-3 bg-blue-50/70 p-4 rounded-2xl border border-blue-200">
+            <div className="flex items-center justify-between">
+              <span className="font-heading font-bold text-xs text-blue-900 flex items-center gap-1.5 uppercase">
+                <span className="material-symbols-outlined text-[18px] text-blue-600">storefront</span>
+                <span>3. Cổng Thanh Toán SePay PG (Merchant ID & Secret Key)</span>
+              </span>
+              <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
+                SePay PG SDK
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Tích hợp Cổng thanh toán theo hướng dẫn chính thức SePay cung cấp (hỗ trợ chuyển hướng cổng thanh toán, thẻ và quét QR tự động). Lấy Merchant ID & Secret Key trong dashboard SePay tại <a href="https://my.sepay.vn" target="_blank" rel="noreferrer" className="text-blue-700 underline font-semibold">my.sepay.vn</a>.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Môi trường (Env):</label>
+                <select
+                  value={sepayPgConfig.env}
+                  onChange={(e) => setSepayPgConfigState({ ...sepayPgConfig, env: e.target.value as any })}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-medium text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="sandbox">Sandbox (Thử nghiệm)</option>
+                  <option value="production">Production (Thực tế)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Merchant ID *:</label>
+                <input
+                  type="text"
+                  value={sepayPgConfig.merchant_id}
+                  onChange={(e) => setSepayPgConfigState({ ...sepayPgConfig, merchant_id: e.target.value.trim() })}
+                  placeholder="VD: MER-12345..."
+                  className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Merchant Secret Key *:</label>
+              <input
+                type="password"
+                value={sepayPgConfig.secret_key}
+                onChange={(e) => setSepayPgConfigState({ ...sepayPgConfig, secret_key: e.target.value.trim() })}
+                placeholder="Dán Merchant Secret Key bảo mật..."
+                className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-mono text-[11px] text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* SECTION 4: SEPAY AUTOMATED BANKING & API V2 (AUTO-POLLING) */}
           <div className="space-y-2.5 bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200">
             <div className="flex items-center justify-between">
               <span className="font-heading font-bold text-xs text-emerald-800 flex items-center gap-1.5 uppercase">
                 <span className="material-symbols-outlined text-[18px] text-emerald-600">verified</span>
-                <span>3. Cổng Tự Động SePay (sepay.vn API v2)</span>
+                <span>4. Tra Cứu Biến Động Số Dư & Auto-Polling</span>
               </span>
               <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
                 Auto-Polling 24/7
               </span>
             </div>
             <p className="text-[11px] text-slate-600">
-              Tự động nhận diện tiền vào tài khoản ngân hàng không cần chụp màn hình chuyển khoản. Lấy API Token tại <a href="https://my.sepay.vn" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-semibold">my.sepay.vn</a>.
+              Nhận diện biến động tiền vào tài khoản ngân hàng không cần chụp màn hình chuyển khoản.
             </p>
 
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                SePay API Token / Bearer Key *:
+                SePay API Token / Bearer Key (Tùy chọn tra cứu trực tiếp):
               </label>
               <input
                 type="password"
                 value={sepayConfig.apiKey}
                 onChange={(e) => setSepayConfigState({ ...sepayConfig, apiKey: e.target.value })}
-                placeholder="Dán mã API Token từ SePay..."
+                placeholder="Dán mã API Token từ my.sepay.vn (nếu có)..."
                 className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-mono text-[11px] text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-semibold text-slate-700 mb-1">STK liên kết SePay:</label>
+                <label className="block text-[10px] font-semibold text-slate-700 mb-1">STK nhận tiền:</label>
                 <input
                   type="text"
                   value={sepayConfig.accountNo}
@@ -243,26 +300,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               </div>
             </div>
 
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={handleTestSepay}
-                disabled={testingSepay}
-                className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
-              >
-                {testingSepay ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>Đang kiểm tra SePay API...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-[15px]">sensors</span>
-                    <span>Kiểm Tra Kết Nối SePay API</span>
-                  </>
-                )}
-              </button>
-            </div>
+            {sepayConfig.apiKey && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleTestSepay}
+                  disabled={testingSepay}
+                  className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                >
+                  {testingSepay ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Đang kiểm tra SePay API...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[15px]">sensors</span>
+                      <span>Kiểm Tra Kết Nối SePay API</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {sepayTestResult && (
               <div className={`p-2.5 rounded-xl text-[11px] font-medium flex items-start gap-1.5 ${sepayTestResult.success ? 'bg-emerald-100/80 text-emerald-900 border border-emerald-300' : 'bg-rose-100/80 text-rose-900 border border-rose-300'}`}>

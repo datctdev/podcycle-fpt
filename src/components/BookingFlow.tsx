@@ -552,32 +552,20 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
             </div>
           </div>
 
-          {/* SePay Dynamic VietQR Real */}
-          {paymentMethod === 'VIETQR' && (() => {
-            const sepayCfg = getSePayConfig();
-            return (
-              <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex flex-col sm:flex-row items-center gap-5">
-                <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200 shrink-0 flex flex-col items-center">
-                  <img 
-                    src={generateSePayQRUrl(selectedService.price, 'PREVIEW', sepayCfg)}
-                    alt="VietQR SePay Napas 24/7" 
-                    className="w-32 h-32 object-contain"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-1 font-semibold">Cổng SePay Napas 24/7</span>
-                </div>
-                <div className="text-xs text-slate-700 space-y-1.5 w-full">
-                  <p className="font-bold text-slate-900 text-sm">Hướng dẫn chuyển khoản qua SePay (Napas 24/7):</p>
-                  <p>Ngân hàng nhận: <strong className="text-slate-900">{sepayCfg.bank}</strong></p>
-                  <p>Số tài khoản: <strong className="font-mono text-sm text-slate-900">{sepayCfg.accountNo}</strong></p>
-                  <p>Chủ tài khoản: <strong className="text-slate-900">{sepayCfg.accountName}</strong></p>
-                  <p>Số tiền: <strong className="text-[#f26f21] text-sm">{selectedService.price.toLocaleString('vi-VN')}đ</strong></p>
-                  <p className="text-amber-800 bg-amber-100/80 p-2 rounded-lg font-medium text-[11px] mt-1 border border-amber-200">
-                    💡 Sau khi bấm "Xác Nhận Đặt Lịch", mã đơn chính thức sẽ được kích hoạt để quét mã và hệ thống tự động kiểm tra giao dịch qua SePay API v2.
-                  </p>
-                </div>
+          {/* SePay Info (Không tạo QR trước khi đặt lịch) */}
+          {paymentMethod === 'VIETQR' && (
+            <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex items-center gap-3.5 text-xs text-slate-700">
+              <div className="w-10 h-10 rounded-xl bg-orange-100 text-[#f26f21] flex items-center justify-center shrink-0">
+                <QrCode className="w-6 h-6 text-[#f26f21]" />
               </div>
-            );
-          })()}
+              <div className="space-y-0.5">
+                <p className="font-bold text-slate-900">Cổng Thanh Toán Tự Động SePay (VietQR Napas 24/7)</p>
+                <p className="text-slate-600 text-[11px]">
+                  Mã QR thanh toán riêng cho đơn hàng này sẽ được tạo ngay sau khi bạn bấm <strong>"Xác Nhận Đặt Lịch"</strong> ở bước tiếp theo.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-between items-center pt-4 border-t border-slate-100">
             <button

@@ -430,23 +430,15 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
         </div>
 
         {paymentMethod === 'VIETQR' && (
-          <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex flex-col sm:flex-row items-center gap-4">
-            <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200 shrink-0">
-              <img
-                src={generateSePayQRUrl(selectedService.price, 'PODCYCLE', sepayConfig)}
-                alt="SePay VietQR Napas 247"
-                className="w-28 h-28 object-contain"
-              />
+          <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex items-center gap-3.5 text-xs text-slate-700">
+            <div className="w-10 h-10 rounded-xl bg-orange-100 text-[#f26f21] flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[22px]">qr_code_scanner</span>
             </div>
-            <div className="text-xs text-slate-700 leading-normal space-y-1 w-full">
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-[#0b1c30]">Ngân hàng: {sepayConfig.bank}</p>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">SePay Napas 24/7</span>
-              </div>
-              <p>Số tài khoản: <strong className="font-mono text-sm text-[#0b1c30]">{sepayConfig.accountNo}</strong></p>
-              <p>Chủ tài khoản: <strong>{sepayConfig.accountName}</strong></p>
-              <p>Số tiền: <strong className="text-[#f26f21] text-sm">{selectedService.price.toLocaleString('vi-VN')}đ</strong></p>
-              <p className="text-[10px] text-slate-500 italic">Mở bất kỳ app ngân hàng nào quét mã để chuyển khoản chính xác.</p>
+            <div className="space-y-0.5">
+              <p className="font-bold text-[#0b1c30]">Cổng Thanh Toán Tự Động SePay (VietQR Napas 24/7)</p>
+              <p className="text-[11px] text-slate-500">
+                Sau khi bấm <strong>"Xác Nhận Đặt Lịch"</strong>, hệ thống sẽ tạo mã QR thanh toán riêng cho đơn hàng này kèm cú pháp chuyển khoản chính xác để bạn quét mã.
+              </p>
             </div>
           </div>
         )}
