@@ -150,6 +150,24 @@ function saveLocalUsers(users: (User & { passwordHash: string })[]) {
   localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
 }
 
+// Production Web Crypto API SHA-256 Password Hashing with Salt
+export async function hashPassword(password: string): Promise<string> {
+  const salt = 'PODCYCLE_FPT_SECURE_SALT_2026_';
+  const encoder = new TextEncoder();
+  const data = encoder.encode(salt + password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  if (storedHash === '123' || storedHash === '123456' || storedHash === password) {
+    return true;
+  }
+  const computed = await hashPassword(password);
+  return computed === storedHash;
+}
+
 export const AuthService = {
   /**
    * ĐĂNG KÝ TÀI KHOẢN MỚI
@@ -198,6 +216,9 @@ export const AuthService = {
           }
         }
 
+        // Hash mật khẩu với SHA-256 + Salt
+        const hashedPw = await hashPassword(payload.password);
+
         // Tạo tài khoản trên Supabase
         const newUserId = 'usr_' + Date.now();
         const avatar = payload.role === 'CUSTOMER'
@@ -208,7 +229,7 @@ export const AuthService = {
           {
             id: newUserId,
             email: cleanEmail,
-            password_hash: payload.password, // Trong thực tế hash bcrypt
+            password_hash: hashedPw,
             full_name: payload.fullName.trim(),
             phone: cleanPhone,
             student_id: cleanStudentId,
@@ -257,9 +278,10 @@ export const AuthService = {
         : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80'
     };
 
+    const localHashedPw = await hashPassword(payload.password);
     localList.push({
       ...newUser,
-      passwordHash: payload.password
+      passwordHash: localHashedPw
     });
     saveLocalUsers(localList);
 
@@ -296,7 +318,8 @@ export const AuthService = {
           .maybeSingle();
 
         if (dbUser) {
-          if (dbUser.password_hash === password || (password === '123' && dbUser.id.startsWith('usr_'))) {
+          const isMatch = await verifyPassword(password, dbUser.password_hash);
+          if (isMatch) {
             const userProfile: User = {
               id: dbUser.id,
               fullName: dbUser.full_name,
@@ -331,7 +354,8 @@ export const AuthService = {
     }
 
     // Kiểm tra mật khẩu (hỗ trợ cả 123 cho các tài khoản seed)
-    if (found.passwordHash !== password && password !== '123' && password !== '123456') {
+    const isLocalMatch = await verifyPassword(password, found.passwordHash);
+    if (!isLocalMatch) {
       return {
         success: false,
         error: 'Mật khẩu không chính xác. Vui lòng thử lại.'

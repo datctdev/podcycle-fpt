@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Booking, BookingStatus, User } from '../types';
 import { CAMPUSES } from '../data/mockData';
+import { playStationNotification } from '../utils/sound';
 
 interface TechnicianWorkspaceProps {
   currentUser: User;
@@ -24,6 +25,29 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
   const [selectedCampus, setSelectedCampus] = useState(CAMPUSES[0].id);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'pipeline' | 'all'>('pipeline');
+
+  // Real device camera / photo upload handler for Before/After inspection
+  const handleUploadPhoto = (
+    bookingId: string,
+    photoType: 'beforePhoto' | 'afterPhoto',
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        const current = bookings.find((b) => b.id === bookingId);
+        if (current) {
+          onUpdateStatus(bookingId, current.status, {
+            [photoType]: base64
+          });
+          playStationNotification('complete');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Live timer tick every 10 seconds for countdown simulation
   const [currentSeconds, setCurrentSeconds] = useState(0);
@@ -246,6 +270,23 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
                       </p>
                     )}
 
+                    {/* Camera / Photo Upload for Before state */}
+                    <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-700/60 flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5 text-slate-300">
+                        <span className="material-symbols-outlined text-[15px] text-[#ffb693]">photo_camera</span>
+                        <span>{b.beforePhoto ? '✓ Đã có ảnh màng loa' : 'Chưa có ảnh hiện trạng'}</span>
+                      </div>
+                      <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-[#ffb693] font-bold px-2 py-1 rounded text-[10px] border border-slate-600 flex items-center gap-1 transition-colors">
+                        <span>{b.beforePhoto ? 'Đổi ảnh' : 'Chụp/Tải ảnh'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleUploadPhoto(b.id, 'beforePhoto', e)}
+                        />
+                      </label>
+                    </div>
+
                     <button
                       onClick={() => onUpdateStatus(b.id, 'CLEANING', {
                         technicianName: currentUser.fullName,
@@ -318,10 +359,30 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
                       </div>
                     </div>
 
+                    {/* Camera / Photo Upload for After state */}
+                    <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-700/60 flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5 text-slate-300">
+                        <span className="material-symbols-outlined text-[15px] text-emerald-400">verified</span>
+                        <span>{b.afterPhoto ? '✓ Đã chụp sau 30p' : 'Chưa có ảnh sạch sau 30p'}</span>
+                      </div>
+                      <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold px-2 py-1 rounded text-[10px] border border-slate-600 flex items-center gap-1 transition-colors">
+                        <span>{b.afterPhoto ? 'Đổi ảnh' : 'Chụp/Tải ảnh'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleUploadPhoto(b.id, 'afterPhoto', e)}
+                        />
+                      </label>
+                    </div>
+
                     <button
-                      onClick={() => onUpdateStatus(b.id, 'READY', {
-                        soundClarityScore: 98
-                      })}
+                      onClick={() => {
+                        playStationNotification('complete');
+                        onUpdateStatus(b.id, 'READY', {
+                          soundClarityScore: 98
+                        });
+                      }}
                       className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-xs"
                     >
                       <span className="material-symbols-outlined text-[16px]">volume_up</span>
@@ -378,10 +439,13 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
                     </div>
 
                     <button
-                      onClick={() => onUpdateStatus(b.id, 'COMPLETED', {
-                        completedAt: new Date().toISOString(),
-                        paymentStatus: 'PAID'
-                      })}
+                      onClick={() => {
+                        playStationNotification('complete');
+                        onUpdateStatus(b.id, 'COMPLETED', {
+                          completedAt: new Date().toISOString(),
+                          paymentStatus: 'PAID'
+                        });
+                      }}
                       className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-xs"
                     >
                       <span className="material-symbols-outlined text-[16px]">verified</span>

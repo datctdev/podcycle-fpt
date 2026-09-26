@@ -169,6 +169,8 @@ export const DatabaseService = {
             status: d.status,
             technicianName: d.technician_name,
             soundClarityScore: d.sound_clarity_score,
+            beforePhoto: d.before_photo,
+            afterPhoto: d.after_photo,
             createdAt: d.created_at,
             completedAt: d.completed_at
           }));
@@ -244,6 +246,8 @@ export const DatabaseService = {
         if (extraUpdates.technicianName) updatePayload.technician_name = extraUpdates.technicianName;
         if (extraUpdates.paymentStatus) updatePayload.payment_status = extraUpdates.paymentStatus;
         if (extraUpdates.soundClarityScore) updatePayload.sound_clarity_score = extraUpdates.soundClarityScore;
+        if (extraUpdates.beforePhoto) updatePayload.before_photo = extraUpdates.beforePhoto;
+        if (extraUpdates.afterPhoto) updatePayload.after_photo = extraUpdates.afterPhoto;
         if (extraUpdates.completedAt) updatePayload.completed_at = extraUpdates.completedAt;
 
         await sb.from('bookings').update(updatePayload).eq('id', bookingId);

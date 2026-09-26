@@ -53,21 +53,44 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
 
         {/* Before / After Photo Comparison */}
         <div className="space-y-2">
-          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[#f26f21] text-[16px]">compare</span>
-            <span>Hình ảnh kiểm chứng ngoại quan (Trước & Sau):</span>
+          <span className="text-xs font-bold text-slate-700 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[#f26f21] text-[16px]">compare</span>
+              <span>Kiểm chứng ngoại quan màng loa thực tế:</span>
+            </span>
+            <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              Chụp tại bàn trực
+            </span>
           </span>
 
-          <div className="rounded-xl overflow-hidden border border-slate-200 shadow-2xs">
-            <img
-              src="/clean-airpods.png"
-              alt="Biên nhận so sánh trước sau"
-              className="w-full h-36 object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?auto=format&fit=crop&w=600&q=80';
-              }}
-            />
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-2xs relative bg-slate-100">
+              <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-full z-10">
+                1. TRƯỚC VỆ SINH
+              </span>
+              <img
+                src={booking.beforePhoto || '/clean-airpods.png'}
+                alt="Trước vệ sinh"
+                className="w-full h-32 object-cover transition-transform hover:scale-105"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/clean-airpods.png';
+                }}
+              />
+            </div>
+
+            <div className="rounded-xl overflow-hidden border border-emerald-300 shadow-2xs relative bg-slate-100 ring-2 ring-emerald-500/20">
+              <span className="absolute top-2 left-2 bg-emerald-600/90 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-full z-10">
+                2. SAU VỆ SINH 30P
+              </span>
+              <img
+                src={booking.afterPhoto || '/clean-airpods.png'}
+                alt="Sau vệ sinh"
+                className="w-full h-32 object-cover transition-transform hover:scale-105"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/clean-airpods.png';
+                }}
+              />
+            </div>
           </div>
         </div>
 

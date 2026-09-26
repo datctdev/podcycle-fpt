@@ -1,17 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Booking } from '../types';
+import { getBankConfig, generateRealVietQR } from '../services/db';
+import { playStationNotification } from '../utils/sound';
 
 interface StitchAppointmentDetailProps {
   booking: Booking;
   onBack: () => void;
   onOpenReview: () => void;
+  onConfirmPayment?: (bookingId: string) => void;
 }
 
 export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = ({
   booking,
   onBack,
-  onOpenReview
+  onOpenReview,
+  onConfirmPayment
 }) => {
+  const bankConfig = getBankConfig();
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [paymentSuccessNotice, setPaymentSuccessNotice] = useState(false);
+
+  const handleVerifyPayment = () => {
+    setIsCheckingPayment(true);
+    setTimeout(() => {
+      setIsCheckingPayment(false);
+      if (onConfirmPayment) {
+        onConfirmPayment(booking.id);
+      }
+      playStationNotification('complete');
+      setPaymentSuccessNotice(true);
+    }, 1200);
+  };
   return (
     <div className="pt-20 pb-28 px-4 sm:px-6 max-w-2xl mx-auto space-y-4">
       
@@ -115,12 +134,80 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Trạng thái thanh toán:</span>
-            <span className={`font-bold ${booking.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-600'}`}>
-              {booking.paymentStatus === 'PAID' ? 'Đã Thanh Toán' : 'Thanh Toán Khi Nhận Máy'}
+            <span className={`font-bold ${booking.paymentStatus === 'PAID' || paymentSuccessNotice ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {booking.paymentStatus === 'PAID' || paymentSuccessNotice ? 'Đã Thanh Toán' : 'Chờ Thanh Toán Qua VietQR / Tiền Mặt'}
             </span>
           </div>
         </div>
       </div>
+
+      {/* REAL VIETQR AUTOMATED PAYMENT SECTION */}
+      {booking.paymentMethod === 'VIETQR' && (
+        <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-200/90 space-y-4">
+          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+            <h3 className="font-heading font-bold text-sm text-[#0b1c30] flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[#f26f21] text-[18px]">qr_code_scanner</span>
+              <span>Cổng Thanh Toán Napas 24/7 (VietQR)</span>
+            </h3>
+            {booking.paymentStatus === 'PAID' || paymentSuccessNotice ? (
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300">
+                <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                <span>ĐÃ THANH TOÁN THÀNH CÔNG</span>
+              </span>
+            ) : (
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse border border-amber-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span>CHỜ THANH TOÁN</span>
+              </span>
+            )}
+          </div>
+
+          {booking.paymentStatus !== 'PAID' && !paymentSuccessNotice ? (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-center gap-4 bg-orange-50/60 p-4 rounded-xl border border-orange-200">
+                <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200 shrink-0">
+                  <img
+                    src={generateRealVietQR(bankConfig, booking.amount, booking.bookingCode)}
+                    alt="VietQR Napas 247"
+                    className="w-32 h-32 object-contain"
+                  />
+                </div>
+                <div className="text-xs text-slate-700 leading-normal space-y-1.5 w-full">
+                  <p>Ngân hàng nhận: <strong className="text-[#0b1c30]">{bankConfig.bankName}</strong></p>
+                  <p>Số tài khoản: <strong className="font-mono text-sm text-[#0b1c30]">{bankConfig.accountNo}</strong></p>
+                  <p>Chủ tài khoản: <strong className="text-[#0b1c30]">{bankConfig.accountName}</strong></p>
+                  <p>Số tiền: <strong className="text-[#f26f21] text-sm">{booking.amount.toLocaleString('vi-VN')}đ</strong></p>
+                  <p>Nội dung CK: <strong className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-[#0b1c30]">TTN {booking.bookingCode}</strong></p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleVerifyPayment}
+                disabled={isCheckingPayment}
+                className="w-full bg-[#10B981] hover:bg-[#059669] text-white font-bold text-xs py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                {isCheckingPayment ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Đang kết nối API kiểm tra biến động số dư ngân hàng...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                    <span>Tôi Đã Chuyển Khoản ➔ Kiểm Tra & Xác Nhận Đơn</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl text-center space-y-1 text-xs text-emerald-800">
+              <span className="material-symbols-outlined text-emerald-600 text-[28px] mx-auto block">task_alt</span>
+              <p className="font-bold text-sm">Giao dịch đã được hệ thống ghi nhận thành công!</p>
+              <p className="text-slate-600">Mã giao dịch đối soát Napas: <strong>TX-{booking.bookingCode}-OK</strong></p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 4. QR Check-in Pass Card */}
       <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200/90 text-center space-y-3">

@@ -66,6 +66,8 @@ export interface Booking {
   cleaningStartedAt?: string;
   completedAt?: string;
   soundClarityScore?: number; // e.g., 98%
+  beforePhoto?: string;
+  afterPhoto?: string;
   createdAt: string;
 }
 
