@@ -28,7 +28,7 @@ export const POPULAR_BANKS = [
   { id: 'VPB', name: 'VPBank (Việt Nam Thịnh Vượng)' }
 ];
 
-// Load Bank Config from storage or default
+// Load Bank Config from storage or environment variables or default
 export const getBankConfig = (): BankConfig => {
   try {
     const saved = localStorage.getItem('ttn_bank_config');
@@ -36,7 +36,12 @@ export const getBankConfig = (): BankConfig => {
   } catch {
     // ignore
   }
-  return DEFAULT_BANK_CONFIG;
+  return {
+    bankId: import.meta.env.VITE_VIETQR_BANK_ID || DEFAULT_BANK_CONFIG.bankId,
+    accountNo: import.meta.env.VITE_VIETQR_ACCOUNT_NO || DEFAULT_BANK_CONFIG.accountNo,
+    accountName: import.meta.env.VITE_VIETQR_ACCOUNT_NAME || DEFAULT_BANK_CONFIG.accountName,
+    bankName: import.meta.env.VITE_VIETQR_BANK_NAME || DEFAULT_BANK_CONFIG.bankName
+  };
 };
 
 export const saveBankConfig = (config: BankConfig) => {
