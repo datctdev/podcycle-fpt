@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
+declare const process: any;
+
 // Vercel Serverless Function Handler
 // Nhận Webhook IPN từ cổng thanh toán SePay trên môi trường Production
 export default async function handler(req: any, res: any) {
