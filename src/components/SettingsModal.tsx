@@ -1,0 +1,195 @@
+import React, { useState } from 'react';
+import { 
+  BankConfig, 
+  getBankConfig, 
+  saveBankConfig, 
+  POPULAR_BANKS, 
+  getSupabaseConfig, 
+  SUPABASE_SQL_SCHEMA 
+} from '../services/db';
+
+interface SettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSaved }) => {
+  const [bankConfig, setBankConfig] = useState<BankConfig>(getBankConfig());
+  const [supabaseUrl, setSupabaseUrl] = useState(getSupabaseConfig().url);
+  const [supabaseKey, setSupabaseKey] = useState(getSupabaseConfig().key);
+  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveBankConfig(bankConfig);
+    if (supabaseUrl) localStorage.setItem('ttn_supabase_url', supabaseUrl.trim());
+    if (supabaseKey) localStorage.setItem('ttn_supabase_key', supabaseKey.trim());
+    setSavedSuccess(true);
+    onSaved();
+    setTimeout(() => {
+      setSavedSuccess(false);
+      onClose();
+    }, 1200);
+  };
+
+  const copySql = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+      <div className="bg-white text-[#0b1c30] rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 border border-slate-200 max-h-[90vh] overflow-y-auto">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#f26f21] text-[24px]">settings</span>
+            <h3 className="font-heading font-extrabold text-base text-[#0b1c30]">
+              Cấu Hình Data Thật (VietQR & Database)
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1">
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+        {savedSuccess && (
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+            <span>Đã lưu thành công cấu hình data thật!</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSave} className="space-y-4 text-xs">
+          
+          {/* SECTION 1: REAL VIETQR BANK CONFIG */}
+          <div className="space-y-2.5 bg-orange-50/60 p-4 rounded-2xl border border-orange-200">
+            <span className="font-heading font-bold text-xs text-[#f26f21] flex items-center gap-1.5 uppercase">
+              <span className="material-symbols-outlined text-[18px]">account_balance</span>
+              <span>1. Tài Khoản Ngân Hàng Thật (VietQR Chuẩn Napas)</span>
+            </span>
+            <p className="text-[11px] text-slate-500">
+              Nhập STK của nhóm bạn để mã QR trên web nhận chuyển khoản tiền thật vào tài khoản.
+            </p>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Ngân hàng:</label>
+              <select
+                value={bankConfig.bankId}
+                onChange={(e) => {
+                  const b = POPULAR_BANKS.find(x => x.id === e.target.value);
+                  setBankConfig({
+                    ...bankConfig,
+                    bankId: e.target.value,
+                    bankName: b?.name || e.target.value
+                  });
+                }}
+                className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-medium focus:ring-2 focus:ring-[#f26f21] focus:outline-none"
+              >
+                {POPULAR_BANKS.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name} ({b.id})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Số Tài Khoản (STK) *:</label>
+                <input
+                  type="text"
+                  value={bankConfig.accountNo}
+                  onChange={(e) => setBankConfig({ ...bankConfig, accountNo: e.target.value })}
+                  placeholder="VD: 0388889999"
+                  required
+                  className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-mono font-bold text-slate-900 focus:ring-2 focus:ring-[#f26f21] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Tên Chủ Tài Khoản (Không dấu) *:</label>
+                <input
+                  type="text"
+                  value={bankConfig.accountName}
+                  onChange={(e) => setBankConfig({ ...bankConfig, accountName: e.target.value.toUpperCase() })}
+                  placeholder="VD: CHAU THANH DAT"
+                  required
+                  className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 focus:ring-2 focus:ring-[#f26f21] focus:outline-none uppercase"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 2: SUPABASE CLOUD DATABASE CONFIG */}
+          <div className="space-y-2.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <span className="font-heading font-bold text-xs text-[#0b1c30] flex items-center gap-1.5 uppercase">
+              <span className="material-symbols-outlined text-[18px]">database</span>
+              <span>2. Kết Nối Cloud Database PostgreSQL (Supabase)</span>
+            </span>
+            <p className="text-[11px] text-slate-500">
+              Đồng bộ đơn đặt lịch real-time giữa điện thoại khách hàng và máy kỹ thuật viên. (Tạo miễn phí 100% tại <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">supabase.com</a>).
+            </p>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Supabase Project URL:</label>
+              <input
+                type="text"
+                value={supabaseUrl}
+                onChange={(e) => setSupabaseUrl(e.target.value)}
+                placeholder="https://xyzcompany.supabase.co"
+                className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-mono text-[11px] text-slate-900 focus:ring-2 focus:ring-[#f26f21] focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Supabase Anon Key:</label>
+              <input
+                type="password"
+                value={supabaseKey}
+                onChange={(e) => setSupabaseKey(e.target.value)}
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-mono text-[11px] text-slate-900 focus:ring-2 focus:ring-[#f26f21] focus:outline-none"
+              />
+            </div>
+
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={copySql}
+                className="w-full py-2 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                <span>{copiedSql ? '✓ Đã copy mã SQL tạo bảng!' : 'Copy mã SQL tạo bảng cho Supabase'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Submit */}
+          <div className="pt-2 flex gap-2">
+            <button
+              type="submit"
+              className="flex-1 fpt-gradient fpt-gradient-hover text-white font-bold text-xs py-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[16px]">save</span>
+              <span>Lưu Cấu Hình Data Thật</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+            >
+              Hủy
+            </button>
+          </div>
+
+        </form>
+
+      </div>
+    </div>
+  );
+};

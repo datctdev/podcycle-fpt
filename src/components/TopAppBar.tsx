@@ -6,13 +6,15 @@ interface TopAppBarProps {
   currentUser: User | null;
   onSelectTab: (tab: string) => void;
   bookingCount: number;
+  onOpenSettings?: () => void;
 }
 
 export const TopAppBar: React.FC<TopAppBarProps> = ({
   currentTab,
   currentUser,
   onSelectTab,
-  bookingCount
+  bookingCount,
+  onOpenSettings
 }) => {
   return (
     <header className="fixed top-0 w-full z-50 bg-[#f8f9ff]/85 backdrop-blur-md shadow-xs flex items-center justify-between px-4 sm:px-6 h-16 border-b border-slate-200/60">
@@ -89,8 +91,18 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
         </button>
       </nav>
 
-      {/* User Login/Profile Action */}
+      {/* User Login/Profile & Settings Action */}
       <div className="flex items-center gap-2">
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            title="Cấu hình VietQR & Database Supabase"
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-[#f26f21] hover:border-orange-300 flex items-center justify-center transition-colors shadow-2xs"
+          >
+            <span className="material-symbols-outlined text-[20px]">settings</span>
+          </button>
+        )}
+
         {currentUser ? (
           <div
             onClick={() => onSelectTab('profile')}

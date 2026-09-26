@@ -17,11 +17,13 @@ import { RegisterPage } from './components/RegisterPage';
 import { ProfilePage } from './components/ProfilePage';
 import { TechnicianWorkspace } from './components/TechnicianWorkspace';
 import { DigitalReceiptModal } from './components/DigitalReceiptModal';
+import { SettingsModal } from './components/SettingsModal';
 
 import { INITIAL_BOOKINGS } from './data/mockData';
 import { DEMO_USERS } from './data/mockUsers';
 import { Booking, ServiceItem, BookingStatus, User } from './types';
 import { trackEvent } from './utils/analytics';
+import { DatabaseService } from './services/db';
 
 export function App() {
   // Navigation State
@@ -31,6 +33,7 @@ export function App() {
   const [receiptBooking, setReceiptBooking] = useState<Booking | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -54,6 +57,15 @@ export function App() {
     }
     return INITIAL_BOOKINGS;
   });
+
+  // Hydrate from DatabaseService (reads from Supabase Cloud if configured, or local cache)
+  useEffect(() => {
+    DatabaseService.getBookings().then((fetched) => {
+      if (fetched && fetched.length > 0) {
+        setBookings(fetched);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     try {
@@ -120,6 +132,7 @@ export function App() {
 
   // Booking creation
   const handleBookingCreated = (newBooking: Booking) => {
+    DatabaseService.createBooking(newBooking);
     setBookings((prev) => [newBooking, ...prev]);
     setActiveBooking(newBooking);
     setCurrentTab('detail');
@@ -132,6 +145,7 @@ export function App() {
     newStatus: BookingStatus, 
     updates?: Partial<Booking>
   ) => {
+    DatabaseService.updateStatus(bookingId, newStatus, updates);
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus, ...updates } : b))
     );
@@ -166,6 +180,15 @@ export function App() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-1 text-[#ffb693] hover:text-white bg-slate-800/80 hover:bg-slate-700 px-2 py-0.5 rounded transition-colors text-[11px] border border-slate-700"
+            title="Cấu hình VietQR & Supabase Cloud Database"
+          >
+            <span className="material-symbols-outlined text-[13px] text-[#f26f21]">settings</span>
+            <span>Cấu hình VietQR / Database</span>
+          </button>
+
           {currentUser?.role === 'TECHNICIAN' ? (
             <button
               onClick={() => {
@@ -206,6 +229,7 @@ export function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           bookingCount={activeCount}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       )}
 
@@ -249,6 +273,7 @@ export function App() {
             onOpenReceipt={handleOpenReceipt}
             onSwitchToStudentView={() => setCurrentTab('home')}
             onLogout={handleLogout}
+            onOpenSettings={() => setIsSettingsOpen(true)}
           />
         )}
 
@@ -282,6 +307,7 @@ export function App() {
           <StitchBooking
             initialService={selectedService}
             currentUser={currentUser}
+            allBookings={bookings}
             onBookingSuccess={handleBookingCreated}
             onBack={() => {
               setCurrentTab('home');
@@ -329,6 +355,15 @@ export function App() {
         isOpen={isReceiptOpen}
         booking={receiptBooking}
         onClose={() => setIsReceiptOpen(false)}
+      />
+
+      {/* Settings Modal (Cấu hình VietQR & Supabase Cloud) */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSaved={() => {
+          DatabaseService.getBookings().then(setBookings);
+        }}
       />
 
       {/* Floating GA4 Live Inspector */}

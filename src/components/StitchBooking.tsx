@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { CAMPUSES, SERVICES, INITIAL_SLOTS } from '../data/mockData';
+import { CAMPUSES, SERVICES } from '../data/mockData';
 import { ServiceItem, DeviceModel, Booking, TimeSlot, User } from '../types';
 import { trackEvent } from '../utils/analytics';
+import { 
+  DatabaseService, 
+  getBankConfig, 
+  generateRealVietQR 
+} from '../services/db';
 
 interface StitchBookingProps {
   initialService?: ServiceItem | null;
   currentUser?: User | null;
+  allBookings: Booking[];
   onBookingSuccess: (booking: Booking) => void;
   onBack: () => void;
 }
@@ -13,6 +19,7 @@ interface StitchBookingProps {
 export const StitchBooking: React.FC<StitchBookingProps> = ({
   initialService,
   currentUser,
+  allBookings,
   onBookingSuccess,
   onBack
 }) => {
@@ -23,6 +30,9 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
     initialService || SERVICES[0]
   );
 
+  // Bank Configuration for Real VietQR
+  const bankConfig = getBankConfig();
+
   // Dates: Next 5 days
   const dateOptions = [
     { label: 'Hôm nay', date: '2026-09-27', day: 'T7' },
@@ -32,9 +42,19 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
     { label: '01/10', date: '2026-10-01', day: 'T4' }
   ];
   const [selectedDate, setSelectedDate] = useState<string>(dateOptions[0].date);
-  const [selectedSlot, setSelectedSlot] = useState<TimeSlot>(INITIAL_SLOTS[0]);
 
-  // Form: Autofill from currentUser if available
+  const campusObj = CAMPUSES.find((c) => c.id === selectedCampus);
+
+  // Dynamic slot calculation from REAL database bookings
+  const dynamicSlots = DatabaseService.calculateSlots(
+    allBookings,
+    selectedDate,
+    campusObj?.name || ''
+  );
+
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot>(dynamicSlots[0]);
+
+  // Form: Autofill from currentUser if logged in
   const [fullName, setFullName] = useState(currentUser?.fullName || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [studentId, setStudentId] = useState(currentUser?.studentId || '');
@@ -87,12 +107,12 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
       campus: selectedCampus
     });
 
-    const campusObj = CAMPUSES.find((c) => c.id === selectedCampus);
     const bookingCode = 'PC-' + Math.floor(2000 + Math.random() * 8000);
 
     const newBooking: Booking = {
       id: 'bk_' + Date.now(),
       bookingCode: bookingCode,
+      userId: currentUser?.id,
       customerName: fullName.trim(),
       phone: phone.trim(),
       studentId: studentId.trim() || 'SE18xxxx',
@@ -129,8 +149,6 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
     onBookingSuccess(newBooking);
   };
 
-  const campusObj = CAMPUSES.find((c) => c.id === selectedCampus);
-
   return (
     <div className="pt-20 pb-24 px-4 sm:px-6 max-w-3xl mx-auto space-y-6">
       
@@ -144,7 +162,9 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
         </button>
         <div>
           <h1 className="font-heading font-bold text-xl text-[#0b1c30]">Đặt Lịch Vệ Sinh</h1>
-          <p className="text-slate-500 text-xs">Điền thông tin và chọn slot hẹn 30 phút giữa ca học</p>
+          <p className="text-slate-500 text-xs">
+            {currentUser ? `Chào mừng ${currentUser.fullName}, thông tin đã được tự động điền` : 'Điền thông tin và chọn slot hẹn 30 phút giữa ca học'}
+          </p>
         </div>
       </div>
 
@@ -221,7 +241,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
         </div>
       </div>
 
-      {/* 4. TIME SLOT CHIPS */}
+      {/* 4. REAL DYNAMIC TIME SLOTS (CALCULATED FROM DATABASE) */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
         <div className="flex justify-between items-center">
           <label className="font-heading font-bold text-sm text-[#0b1c30] flex items-center gap-2">
@@ -229,12 +249,12 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
             <span>4. Khung Giờ Trực Sảnh (30 Phút):</span>
           </label>
           <span className="text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
-            Tối đa 3 tai nghe / ca
+            Dữ liệu slot thực tế (Tối đa 3 máy/ca)
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          {INITIAL_SLOTS.map((slot) => {
+          {dynamicSlots.map((slot) => {
             const isFull = slot.bookedCount >= slot.maxCapacity;
             const isSelected = selectedSlot.id === slot.id;
 
@@ -254,7 +274,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
               >
                 <div className="font-bold text-xs">{slot.time}</div>
                 <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-white/80' : isFull ? 'text-red-500' : 'text-emerald-600'}`}>
-                  {isFull ? 'Đã hết slot' : `Còn ${slot.maxCapacity - slot.bookedCount} chỗ`}
+                  {isFull ? 'Đã hết slot' : `Còn ${slot.maxCapacity - slot.bookedCount} chỗ trống`}
                 </div>
               </button>
             );
@@ -363,11 +383,11 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
         </div>
       </div>
 
-      {/* 7. PAYMENT METHOD */}
+      {/* 7. REAL VIETQR PAYMENT METHOD */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
         <label className="font-heading font-bold text-sm text-[#0b1c30] flex items-center gap-2">
           <span className="material-symbols-outlined text-[#f26f21] text-[18px]">payments</span>
-          <span>7. Phương Thức Thanh Toán:</span>
+          <span>7. Phương Thức Thanh Toán (VietQR Chuẩn Napas):</span>
         </label>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -381,9 +401,11 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
           >
             <div className="flex items-center gap-2 font-bold text-xs text-[#0b1c30]">
               <span className="material-symbols-outlined text-[#f26f21] text-[18px]">qr_code_2</span>
-              <span>Chuyển khoản VietQR SePay</span>
+              <span>Chuyển khoản VietQR Real</span>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Quét mã QR ngân hàng hoặc MoMo, tự động xác nhận</p>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Quét từ app ngân hàng thật (VCB, MB, Techcombank, MoMo...), tự động điền STK & số tiền
+            </p>
           </div>
 
           <div
@@ -403,16 +425,23 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
         </div>
 
         {paymentMethod === 'VIETQR' && (
-          <div className="bg-orange-50/70 p-3.5 rounded-xl border border-orange-200 flex items-center gap-3">
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=TIEMTAINHO_${selectedService.price}`}
-              alt="QR SePay"
-              className="w-18 h-18 rounded-lg shadow-2xs border border-white"
-            />
-            <div className="text-[11px] text-slate-600 leading-tight space-y-0.5">
-              <p className="font-bold text-[#0b1c30]">MB Bank • 0388889999 • TIEM TAI NHO FPT</p>
-              <p>Số tiền: <strong className="text-[#f26f21]">{selectedService.price.toLocaleString('vi-VN')}đ</strong></p>
-              <p className="text-[10px] text-slate-400">Vé hẹn sẽ được kích hoạt ngay khi bạn bấm Xác nhận bên dưới.</p>
+          <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex flex-col sm:flex-row items-center gap-4">
+            <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200 shrink-0">
+              <img
+                src={generateRealVietQR(bankConfig, selectedService.price, 'PODCYCLE')}
+                alt="VietQR Napas 247"
+                className="w-28 h-28 object-contain"
+              />
+            </div>
+            <div className="text-xs text-slate-700 leading-normal space-y-1 w-full">
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-[#0b1c30]">Ngân hàng: {bankConfig.bankName}</p>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">Napas 24/7</span>
+              </div>
+              <p>Số tài khoản: <strong className="font-mono text-sm text-[#0b1c30]">{bankConfig.accountNo}</strong></p>
+              <p>Chủ tài khoản: <strong>{bankConfig.accountName}</strong></p>
+              <p>Số tiền: <strong className="text-[#f26f21] text-sm">{selectedService.price.toLocaleString('vi-VN')}đ</strong></p>
+              <p className="text-[10px] text-slate-500 italic">Mở bất kỳ app ngân hàng nào quét mã để chuyển khoản chính xác.</p>
             </div>
           </div>
         )}
@@ -421,7 +450,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
       {/* CONFIRMATION FOOTER BAR */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex items-center justify-between">
         <div>
-          <span className="text-[10px] text-slate-400 uppercase font-bold block">Tổng dịch vụ:</span>
+          <span className="text-[10px] text-slate-400 uppercase font-bold block">Tổng thanh toán:</span>
           <span className="font-heading font-black text-xl text-[#f26f21]">
             {selectedService.price.toLocaleString('vi-VN')}đ
           </span>
