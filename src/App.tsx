@@ -11,7 +11,6 @@ import { StitchAppointmentDetail } from './components/StitchAppointmentDetail';
 import { StitchAppointmentList } from './components/StitchAppointmentList';
 import { StitchReviewModal } from './components/StitchReviewModal';
 import { BottomNavBar } from './components/BottomNavBar';
-import { AnalyticsInspector } from './components/AnalyticsInspector';
 import { Footer } from './components/Footer';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
@@ -625,9 +624,6 @@ export function App() {
         booking={receiptBooking}
         onClose={() => setIsReceiptOpen(false)}
       />
-
-      {/* Floating GA4 Live Inspector */}
-      <AnalyticsInspector />
 
       {/* Footer (Only for customer views) */}
       {!isTechWorkspace && !isAuthPage && <Footer onNavigate={handleSelectTab} />}
