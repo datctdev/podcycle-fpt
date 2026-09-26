@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PODCYCLE</string>
+    <string name="title_activity_main">PODCYCLE</string>
+    <string name="package_name">com.podcycle.app</string>
+    <string name="custom_url_scheme">com.podcycle.app</string>
+</resources>

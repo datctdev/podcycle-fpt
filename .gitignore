@@ -28,3 +28,10 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Android & APK
+*.apk
+android/app/build/
+android/.gradle/
+android/local.properties
+
