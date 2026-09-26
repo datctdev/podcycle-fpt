@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { User, UserRole } from '../types';
 import { AuthService, AuthValidator, ValidationErrors } from '../services/auth';
+import { trackEvent } from '../utils/analytics';
 
 interface RegisterPageProps {
   onRegisterSuccess: (user: User) => void;
@@ -154,6 +156,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
         setIsLoading(false);
         return;
       }
+
+      // Track registration event in GA4
+      trackEvent('sign_up', {
+        method: 'credentials',
+        role: response.user.role,
+        campus: response.user.campus || 'fpt-hcm'
+      });
 
       setSuccessMessage('Đăng ký tài khoản thành công! Đang chuyển hướng...');
       setTimeout(() => {
@@ -522,6 +531,17 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
                   Đăng nhập tại đây
                 </button>
               </p>
+            </div>
+
+            {/* Public Legal & Contact links */}
+            <div className="flex items-center justify-center gap-3 pt-2 text-[11px] text-slate-400">
+              <Link to="/privacy" className="hover:text-slate-600 underline">
+                Chính sách quyền riêng tư
+              </Link>
+              <span>•</span>
+              <Link to="/contact" className="hover:text-slate-600 underline">
+                Liên hệ hỗ trợ
+              </Link>
             </div>
 
           </form>

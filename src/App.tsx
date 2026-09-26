@@ -19,6 +19,8 @@ import { ProfilePage } from './components/ProfilePage';
 import { TechnicianWorkspace } from './components/TechnicianWorkspace';
 import { DigitalReceiptModal } from './components/DigitalReceiptModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ContactPage } from './components/ContactPage';
+import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 
 import { INITIAL_SEED_BOOKINGS } from './services/dataInit';
 import { Booking, ServiceItem, BookingStatus, User } from './types';
@@ -147,10 +149,14 @@ export function App() {
     return INITIAL_SEED_BOOKINGS;
   });
 
-  // MANDATORY AUTH GUARD: Force redirect to /login if not authenticated
+  // MANDATORY AUTH GUARD: Force redirect to /login if not authenticated (except public routes)
   useEffect(() => {
-    const isAuthRoute = location.pathname.startsWith('/login') || location.pathname.startsWith('/register');
-    if (!currentUser && !isAuthRoute) {
+    const isPublicRoute =
+      location.pathname.startsWith('/login') ||
+      location.pathname.startsWith('/register') ||
+      location.pathname.startsWith('/contact') ||
+      location.pathname.startsWith('/privacy');
+    if (!currentUser && !isPublicRoute) {
       navigate('/login', { replace: true });
     }
   }, [currentUser, location.pathname]);
@@ -204,6 +210,8 @@ export function App() {
     if (path.startsWith('/register')) return 'register';
     if (path.startsWith('/profile')) return 'profile';
     if (path.startsWith('/detail')) return 'detail';
+    if (path.startsWith('/contact')) return 'contact';
+    if (path.startsWith('/privacy')) return 'privacy';
     return 'home';
   };
 
@@ -450,10 +458,32 @@ export function App() {
                   bookings={bookings}
                   onLogout={handleLogout}
                   onGoToTechnicianWorkspace={() => navigate('/tech-workspace')}
+                  onNavigate={handleSelectTab}
                 />
               ) : (
                 <Navigate to="/login" replace />
               )
+            }
+          />
+
+          {/* CONTACT ROUTE (Public/Protected) */}
+          <Route
+            path="/contact"
+            element={
+              <ContactPage
+                currentUser={currentUser}
+                onBackToHome={() => navigate('/')}
+              />
+            }
+          />
+
+          {/* PRIVACY POLICY ROUTE (Bắt buộc CH Play & Nghị định 13) */}
+          <Route
+            path="/privacy"
+            element={
+              <PrivacyPolicyPage
+                onBackToHome={() => navigate('/')}
+              />
             }
           />
 
@@ -513,7 +543,7 @@ export function App() {
       <AnalyticsInspector />
 
       {/* Footer (Only for customer views) */}
-      {!isTechWorkspace && !isAuthPage && <Footer />}
+      {!isTechWorkspace && !isAuthPage && <Footer onNavigate={handleSelectTab} />}
 
       {/* Mobile Bottom Navigation (Only for customer views) */}
       {!isTechWorkspace && !isAuthPage && (

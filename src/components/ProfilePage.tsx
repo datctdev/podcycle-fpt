@@ -6,13 +6,15 @@ interface ProfilePageProps {
   bookings: Booking[];
   onLogout: () => void;
   onGoToTechnicianWorkspace: () => void;
+  onNavigate?: (tab: string) => void;
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({
   user,
   bookings,
   onLogout,
-  onGoToTechnicianWorkspace
+  onGoToTechnicianWorkspace,
+  onNavigate
 }) => {
   const userBookings = bookings.filter(
     (b) => b.phone === user.phone || b.studentId === user.studentId
@@ -100,6 +102,31 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         >
           <span>Vào Workspace Kỹ Thuật Viên</span>
           <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+        </button>
+      </div>
+
+      {/* Support & Legal Links */}
+      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/90 divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+        <button
+          onClick={() => onNavigate && onNavigate('contact')}
+          className="w-full py-2.5 flex items-center justify-between hover:text-[#f26f21] transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-[#f26f21] text-[18px]">support_agent</span>
+            <span>Trung Tâm Liên Hệ & Hỗ Trợ Kỹ Thuật</span>
+          </div>
+          <span className="material-symbols-outlined text-slate-400 text-[16px]">chevron_right</span>
+        </button>
+
+        <button
+          onClick={() => onNavigate && onNavigate('privacy')}
+          className="w-full py-2.5 flex items-center justify-between hover:text-[#f26f21] transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-indigo-500 text-[18px]">policy</span>
+            <span>Chính Sách Quyền Riêng Tư (CH Play)</span>
+          </div>
+          <span className="material-symbols-outlined text-slate-400 text-[16px]">chevron_right</span>
         </button>
       </div>
 

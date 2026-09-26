@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { User } from '../types';
 import { AuthService } from '../services/auth';
+import { trackEvent } from '../utils/analytics';
 
 interface LoginPageProps {
   onLoginSuccess: (user: User) => void;
@@ -47,6 +49,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setError(result.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
         return;
       }
+
+      // Track successful login event in GA4
+      trackEvent('login', {
+        method: 'credentials',
+        role: result.user.role,
+        campus: result.user.campus || 'fpt-hcm'
+      });
 
       setIsLoading(false);
       onLoginSuccess(result.user);
@@ -197,6 +206,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   Đăng ký tài khoản mới
                 </button>
               </p>
+            </div>
+
+            {/* Public Legal & Contact links */}
+            <div className="flex items-center justify-center gap-3 pt-2 text-[11px] text-slate-400">
+              <Link to="/privacy" className="hover:text-slate-600 underline">
+                Chính sách quyền riêng tư
+              </Link>
+              <span>•</span>
+              <Link to="/contact" className="hover:text-slate-600 underline">
+                Liên hệ hỗ trợ
+              </Link>
             </div>
 
           </form>

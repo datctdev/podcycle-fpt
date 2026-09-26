@@ -72,6 +72,17 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
           Lịch hẹn của tôi
         </button>
 
+        <button
+          onClick={() => onSelectTab('contact')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            currentTab === 'contact'
+              ? 'bg-[#f26f21] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          Liên hệ & Hỗ trợ
+        </button>
+
         {/* Technician workspace button */}
         <button
           onClick={() => onSelectTab('tech-workspace')}
