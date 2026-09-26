@@ -6,21 +6,24 @@ interface TopAppBarProps {
   currentUser: User | null;
   onSelectTab: (tab: string) => void;
   bookingCount: number;
-  onOpenSettings?: () => void;
 }
 
 export const TopAppBar: React.FC<TopAppBarProps> = ({
   currentTab,
   currentUser,
   onSelectTab,
-  bookingCount,
-  onOpenSettings
+  bookingCount
 }) => {
+  const isTechnician = currentUser?.role === 'TECHNICIAN';
+
   return (
     <header className="fixed top-0 w-full z-50 bg-[#f8f9ff]/85 backdrop-blur-md shadow-xs flex items-center justify-between px-4 sm:px-6 h-16 border-b border-slate-200/60">
       
       {/* Brand & Menu */}
-      <div className="flex items-center gap-3 cursor-pointer" onClick={() => onSelectTab('home')}>
+      <div 
+        className="flex items-center gap-3 cursor-pointer" 
+        onClick={() => onSelectTab(isTechnician ? 'tech-workspace' : 'home')}
+      >
         <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#f26f21] to-[#ffb693] flex items-center justify-center text-white shadow-md shadow-orange-500/20">
           <span className="material-symbols-outlined text-[20px]">headphones</span>
         </div>
@@ -30,89 +33,111 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
               PODCYCLE
             </span>
             <span className="bg-[#f26f21]/10 text-[#f26f21] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#f26f21]/20">
-              FPT CAMPUS
+              {isTechnician ? 'KTV STATION' : 'FPT CAMPUS Q.9'}
             </span>
           </div>
-          <p className="text-[11px] text-[#584238] hidden sm:block">Chăm sóc tai nghe chuyên nghiệp 30 phút</p>
+          <p className="text-[11px] text-[#584238] hidden sm:block">
+            {isTechnician ? 'Trạm tiếp nhận & kiểm định âm thanh' : 'Chăm sóc tai nghe chuyên nghiệp 30 phút'}
+          </p>
         </div>
       </div>
 
-      {/* Desktop Navigation */}
+      {/* Desktop Navigation - PHÂN QUYỀN TÁCH BIỆT RÕ RÀNG */}
       <nav className="hidden md:flex items-center gap-1 bg-white/70 p-1 rounded-xl border border-slate-200">
-        <button
-          onClick={() => onSelectTab('home')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            currentTab === 'home'
-              ? 'bg-[#f26f21] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          Trang chủ
-        </button>
+        {isTechnician ? (
+          // MENU DÀNH RIÊNG CHO KỸ THUẬT VIÊN
+          <>
+            <button
+              onClick={() => onSelectTab('tech-workspace')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                currentTab === 'tech-workspace'
+                  ? 'bg-[#0b1c30] text-white shadow-xs'
+                  : 'text-[#0b1c30] hover:bg-slate-100'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px] text-[#f26f21]">engineering</span>
+              <span>Bàn Trực Kỹ Thuật Viên</span>
+              {bookingCount > 0 && (
+                <span className="bg-[#10B981] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                  {bookingCount}
+                </span>
+              )}
+            </button>
 
-        <button
-          onClick={() => onSelectTab('booking')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            currentTab === 'booking'
-              ? 'bg-[#f26f21] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          Đặt lịch
-        </button>
+            <button
+              onClick={() => onSelectTab('appointments')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                currentTab === 'appointments'
+                  ? 'bg-[#f26f21] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              Tất cả Lịch Hẹn Trạm
+            </button>
 
-        <button
-          onClick={() => onSelectTab('appointments')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            currentTab === 'appointments'
-              ? 'bg-[#f26f21] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          Lịch hẹn của tôi
-        </button>
+            <button
+              onClick={() => onSelectTab('contact')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                currentTab === 'contact'
+                  ? 'bg-[#f26f21] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              Hotline Ca Trực
+            </button>
+          </>
+        ) : (
+          // MENU DÀNH RIÊNG CHO KHÁCH HÀNG (SINH VIÊN)
+          <>
+            <button
+              onClick={() => onSelectTab('home')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                currentTab === 'home'
+                  ? 'bg-[#f26f21] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              Trang chủ
+            </button>
 
-        <button
-          onClick={() => onSelectTab('contact')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            currentTab === 'contact'
-              ? 'bg-[#f26f21] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          Liên hệ & Hỗ trợ
-        </button>
+            <button
+              onClick={() => onSelectTab('booking')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                currentTab === 'booking'
+                  ? 'bg-[#f26f21] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              Đặt lịch
+            </button>
 
-        {/* Technician workspace button */}
-        <button
-          onClick={() => onSelectTab('tech-workspace')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
-            currentTab === 'tech-workspace'
-              ? 'bg-[#0b1c30] text-white shadow-xs'
-              : 'text-[#f26f21] bg-orange-50 hover:bg-orange-100 border border-orange-200'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[15px]">engineering</span>
-          <span>Workspace Kỹ Thuật Viên</span>
-          {bookingCount > 0 && (
-            <span className="bg-[#10B981] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
-              {bookingCount}
-            </span>
-          )}
-        </button>
+            <button
+              onClick={() => onSelectTab('appointments')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                currentTab === 'appointments'
+                  ? 'bg-[#f26f21] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              Lịch hẹn của tôi
+            </button>
+
+            <button
+              onClick={() => onSelectTab('contact')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                currentTab === 'contact'
+                  ? 'bg-[#f26f21] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              Liên hệ & Hỗ trợ
+            </button>
+          </>
+        )}
       </nav>
 
-      {/* User Login/Profile & Settings Action */}
+      {/* User Login/Profile (Đã bỏ bánh răng cấu hình) */}
       <div className="flex items-center gap-2">
-        {onOpenSettings && (
-          <button
-            onClick={onOpenSettings}
-            title="Cấu hình VietQR & Database Supabase"
-            className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-[#f26f21] hover:border-orange-300 flex items-center justify-center transition-colors shadow-2xs"
-          >
-            <span className="material-symbols-outlined text-[20px]">settings</span>
-          </button>
-        )}
 
         {currentUser ? (
           <div

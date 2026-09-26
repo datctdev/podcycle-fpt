@@ -28,7 +28,7 @@ export const StitchSteps: React.FC = () => {
           <div>
             <h4 className="font-heading font-bold text-base text-cyan-800 mb-1">2. Gửi thiết bị</h4>
             <p className="text-slate-600 text-xs leading-relaxed">
-              Mang AirPods gửi trực tiếp tại bàn trực sảnh tự học Tòa nhà A (Q.9) hoặc Beta Hall (Hòa Lạc).
+              Mang AirPods gửi trực tiếp tại bàn trực sảnh tự học Tòa nhà A (Campus Q.9 TP.HCM).
             </p>
           </div>
         </div>

@@ -16,15 +16,13 @@ interface StitchAppointmentDetailProps {
   onBack: () => void;
   onOpenReview: () => void;
   onConfirmPayment?: (bookingId: string) => void;
-  onOpenSettings?: () => void;
 }
 
 export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = ({
   booking,
   onBack,
   onOpenReview,
-  onConfirmPayment,
-  onOpenSettings
+  onConfirmPayment
 }) => {
   const pgConfig = getSePayPgConfig();
   const hasPgConfig = Boolean(pgConfig.merchant_id && pgConfig.secret_key);
@@ -155,8 +153,7 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
   // 4. Nút kiểm tra thủ công SePay
   const handleManualCheckPayment = async () => {
     if (!hasPgConfig && !sepayApiToken) {
-      setCheckStatusMessage('Chưa cấu hình SePay Merchant ID hoặc API Token! Vui lòng bấm vào icon Bánh Răng để thêm cấu hình.');
-      if (onOpenSettings) onOpenSettings();
+      setCheckStatusMessage('Chưa cấu hình SePay Merchant ID hoặc API Token trong hệ thống.');
       return;
     }
 

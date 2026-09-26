@@ -132,7 +132,7 @@ export const PrivacyPolicyPage: React.FC<PrivacyPolicyPageProps> = ({ onBackToHo
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
             <p className="font-bold text-slate-900">Ban Quản Trị Dự Án Tiệm Tai Nhỏ - PODCYCLE FPT (EXE201)</p>
             <p className="text-slate-600">Trưởng nhóm phụ trách kỹ thuật: <strong>Châu Thành Đạt</strong> (SE180123)</p>
-            <p className="text-slate-600">Email tiếp nhận khiếu nại bảo mật: <strong>datct.se18@fpt.edu.vn</strong> / <strong>support.podcycle@fpt.edu.vn</strong></p>
+            <p className="text-slate-600">Email tiếp nhận khiếu nại bảo mật: <strong>datctse181971@fpt.edu.vn</strong></p>
             <p className="text-slate-600">Địa chỉ liên hệ: Khu Công Nghệ Cao, Long Thạnh Mỹ, TP. Thủ Đức, TP. Hồ Chí Minh</p>
           </div>
         </div>

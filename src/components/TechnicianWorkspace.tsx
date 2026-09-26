@@ -16,7 +16,6 @@ interface TechnicianWorkspaceProps {
   onOpenReceipt: (booking: Booking) => void;
   onSwitchToStudentView: () => void;
   onLogout: () => void;
-  onOpenSettings?: () => void;
 }
 
 export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
@@ -25,8 +24,7 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
   onUpdateStatus,
   onOpenReceipt,
   onSwitchToStudentView,
-  onLogout,
-  onOpenSettings
+  onLogout
 }) => {
   const [selectedCampus, setSelectedCampus] = useState(CAMPUSES[0].id);
   const [searchTerm, setSearchTerm] = useState('');
@@ -301,16 +299,6 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {onOpenSettings && (
-            <button
-              onClick={onOpenSettings}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5"
-              title="Cấu hình DB & Cổng SePay"
-            >
-              <span className="material-symbols-outlined text-[16px] text-[#f26f21]">settings</span>
-              <span className="hidden sm:inline">Cấu hình</span>
-            </button>
-          )}
 
           <button
             onClick={onSwitchToStudentView}

@@ -18,7 +18,6 @@ import { RegisterPage } from './components/RegisterPage';
 import { ProfilePage } from './components/ProfilePage';
 import { TechnicianWorkspace } from './components/TechnicianWorkspace';
 import { DigitalReceiptModal } from './components/DigitalReceiptModal';
-import { SettingsModal } from './components/SettingsModal';
 import { ContactPage } from './components/ContactPage';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 
@@ -33,15 +32,13 @@ function AppointmentDetailRoute({
   activeBooking,
   onBack,
   onOpenReview,
-  onConfirmPayment,
-  onOpenSettings
+  onConfirmPayment
 }: {
   bookings: Booking[];
   activeBooking: Booking | null;
   onBack: () => void;
   onOpenReview: () => void;
   onConfirmPayment: (id: string) => void;
-  onOpenSettings?: () => void;
 }) {
   const { bookingCode } = useParams<{ bookingCode?: string }>();
   const targetBooking = bookingCode
@@ -72,7 +69,6 @@ function AppointmentDetailRoute({
       onBack={onBack}
       onOpenReview={onOpenReview}
       onConfirmPayment={onConfirmPayment}
-      onOpenSettings={onOpenSettings}
     />
   );
 }
@@ -127,7 +123,6 @@ export function App() {
   const [receiptBooking, setReceiptBooking] = useState<Booking | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Authentication State: Null by default if not stored in localStorage
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -302,10 +297,15 @@ export function App() {
     setIsReceiptOpen(true);
   };
 
-  // Filter bookings for customer view
-  const customerBookings = currentUser?.role === 'CUSTOMER'
-    ? bookings.filter((b) => b.phone === currentUser.phone || b.studentId === currentUser.studentId || !b.userId)
-    : bookings;
+  // Filter bookings for customer view: CHỈ LẤY ĐÚNG LỊCH HẸN CỦA TÀI KHOẢN ĐANG ĐĂNG NHẬP
+  const customerBookings = currentUser
+    ? bookings.filter((b) => {
+        if (b.userId && b.userId === currentUser.id) return true;
+        if (currentUser.phone && b.phone && b.phone.trim() === currentUser.phone.trim()) return true;
+        if (currentUser.studentId && b.studentId && b.studentId.trim().toUpperCase() === currentUser.studentId.trim().toUpperCase()) return true;
+        return false;
+      })
+    : [];
 
   const activeCount = bookings.filter(
     (b) => b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && b.status !== 'REFUNDED'
@@ -324,7 +324,6 @@ export function App() {
           currentUser={currentUser}
           onSelectTab={handleSelectTab}
           bookingCount={activeCount}
-          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       )}
 
@@ -336,12 +335,6 @@ export function App() {
             <span className="font-bold shrink-0">DATABASE THỰC:</span>
             <span className="truncate">{dbErrorMessage}</span>
           </div>
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="bg-white text-red-700 px-3 py-1 rounded-lg font-bold text-[11px] shrink-0 hover:bg-red-50 ml-2"
-          >
-            Cấu hình Supabase
-          </button>
         </div>
       )}
 
@@ -426,13 +419,13 @@ export function App() {
             element={
               currentUser ? (
                 <StitchAppointmentList
-                  bookings={customerBookings}
+                  bookings={currentUser.role === 'TECHNICIAN' ? bookings : customerBookings}
                   onSelectBooking={(b) => {
                     setActiveBooking(b);
                     navigate(`/detail/${b.bookingCode}`);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  isStaffMode={false}
+                  isStaffMode={currentUser.role === 'TECHNICIAN'}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -451,7 +444,6 @@ export function App() {
                   onBack={() => navigate('/appointments')}
                   onOpenReview={() => setIsReviewOpen(true)}
                   onConfirmPayment={handleConfirmPayment}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -468,7 +460,6 @@ export function App() {
                   onBack={() => navigate('/appointments')}
                   onOpenReview={() => setIsReviewOpen(true)}
                   onConfirmPayment={handleConfirmPayment}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -476,14 +467,14 @@ export function App() {
             }
           />
 
-          {/* PROFILE ROUTE (Protected) */}
+          {/* PROFILE ROUTE (Protected - Chỉ truyền lịch hẹn của chính user) */}
           <Route
             path="/profile"
             element={
               currentUser ? (
                 <ProfilePage
                   user={currentUser}
-                  bookings={bookings}
+                  bookings={customerBookings}
                   onLogout={handleLogout}
                   onGoToTechnicianWorkspace={() => navigate('/tech-workspace')}
                   onNavigate={handleSelectTab}
@@ -528,7 +519,6 @@ export function App() {
                   onOpenReceipt={handleOpenReceipt}
                   onSwitchToStudentView={() => navigate('/')}
                   onLogout={handleLogout}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
                 />
               ) : (
                 <TechnicianGuardCard
@@ -557,13 +547,6 @@ export function App() {
         isOpen={isReceiptOpen}
         booking={receiptBooking}
         onClose={() => setIsReceiptOpen(false)}
-      />
-
-      {/* Settings Modal (Cấu hình VietQR & Supabase Cloud) */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onSaved={refreshBookingsFromDatabase}
       />
 
       {/* Floating GA4 Live Inspector */}

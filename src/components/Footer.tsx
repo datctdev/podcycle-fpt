@@ -23,7 +23,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </p>
             <div className="flex items-center gap-2 text-[11px] text-slate-400">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Trực tiếp tại FPT TP.HCM & Hà Nội</span>
+              <span>Trực tiếp tại FPT TP.HCM (Campus Q.9)</span>
             </div>
           </div>
 
@@ -62,7 +62,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </li>
               <li className="flex items-center gap-1.5 text-slate-400 pt-0.5">
                 <Mail className="w-3.5 h-3.5 text-slate-500" />
-                <span>support.podcycle@fpt.edu.vn</span>
+                <a href="mailto:datctse181971@fpt.edu.vn" className="hover:text-[#f26f21]">
+                  datctse181971@fpt.edu.vn
+                </a>
               </li>
             </ul>
           </div>
@@ -77,7 +79,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </span>
             </div>
             <p className="text-slate-500 text-[11px]">
-              Trạm bàn giao: Sảnh Tự Học Tòa Nhà A (Campus Q.9 TP.HCM) & Sảnh Beta Hall (Hòa Lạc HN).
+              Trạm bàn giao: Sảnh Tự Học Tòa Nhà A (Campus Q.9 TP.HCM).
             </p>
           </div>
 

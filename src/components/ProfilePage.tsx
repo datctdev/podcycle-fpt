@@ -18,9 +18,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onNavigate,
   onOpenReceipt
 }) => {
-  const userBookings = bookings.filter(
-    (b) => b.phone === user.phone || b.studentId === user.studentId
-  );
+  const userBookings = bookings.filter((b) => {
+    if (b.userId && b.userId === user.id) return true;
+    if (user.phone && b.phone && b.phone.trim() === user.phone.trim()) return true;
+    if (user.studentId && b.studentId && b.studentId.trim().toUpperCase() === user.studentId.trim().toUpperCase()) return true;
+    return false;
+  });
 
   return (
     <div className="pt-20 pb-28 px-4 sm:px-6 max-w-xl mx-auto space-y-5">
@@ -141,24 +144,26 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         )}
       </div>
 
-      {/* Technician Switcher (If technician or for test convenience) */}
-      <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#ffb693] text-[20px]">engineering</span>
-          <div>
-            <h4 className="font-heading font-bold text-xs">Khu Vực Làm Việc Của Kỹ Thuật Viên</h4>
-            <p className="text-[11px] text-slate-400">Dành riêng cho nhân viên trực tại trạm sảnh tự học campus</p>
+      {/* Technician Switcher (Chỉ hiển thị với Kỹ thuật viên) */}
+      {user.role === 'TECHNICIAN' && (
+        <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#ffb693] text-[20px]">engineering</span>
+            <div>
+              <h4 className="font-heading font-bold text-xs">Bàn Trực Kỹ Thuật Viên Trạm</h4>
+              <p className="text-[11px] text-slate-400">Dành riêng cho nhân viên trực tại trạm sảnh tự học campus</p>
+            </div>
           </div>
-        </div>
 
-        <button
-          onClick={onGoToTechnicianWorkspace}
-          className="w-full bg-[#f26f21] hover:bg-[#e05e10] text-white font-bold text-xs py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5"
-        >
-          <span>Vào Workspace Kỹ Thuật Viên</span>
-          <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-        </button>
-      </div>
+          <button
+            onClick={onGoToTechnicianWorkspace}
+            className="w-full bg-[#f26f21] hover:bg-[#e05e10] text-white font-bold text-xs py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <span>Vào Bàn Trực Kỹ Thuật Viên</span>
+            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </button>
+        </div>
+      )}
 
       {/* Support & Legal Links */}
       <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/90 divide-y divide-slate-100 text-xs font-semibold text-slate-700">

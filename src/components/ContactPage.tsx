@@ -108,8 +108,8 @@ export const ContactPage: React.FC<ContactPageProps> = ({ currentUser, onBackToH
               <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-100 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-slate-500 uppercase font-bold block">Hotline Trực Ca Sảnh</span>
-                  <a href="tel:0901234567" className="font-heading font-black text-base text-[#f26f21] hover:underline">
-                    0901.234.567
+                  <a href="tel:0339013262" className="font-heading font-black text-base text-[#f26f21] hover:underline">
+                    0339.013.262
                   </a>
                 </div>
                 <span className="material-symbols-outlined text-[#f26f21] text-[24px]">phone_in_talk</span>
@@ -118,7 +118,9 @@ export const ContactPage: React.FC<ContactPageProps> = ({ currentUser, onBackToH
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-slate-500 uppercase font-bold block">Email Hỗ Trợ Dự Án</span>
-                  <span className="font-semibold text-slate-800">support.podcycle@fpt.edu.vn</span>
+                  <a href="mailto:datctse181971@fpt.edu.vn" className="font-semibold text-slate-800 hover:text-[#f26f21]">
+                    datctse181971@fpt.edu.vn
+                  </a>
                 </div>
                 <span className="material-symbols-outlined text-slate-500 text-[20px]">mail</span>
               </div>
@@ -145,13 +147,6 @@ export const ContactPage: React.FC<ContactPageProps> = ({ currentUser, onBackToH
                 <p className="font-bold text-slate-900">Campus TP.HCM (Quận 9)</p>
                 <p className="text-slate-500 text-[11px] mt-0.5">
                   Bàn trực Sảnh Tự Học Tòa Nhà A (cạnh Canteen). Giờ trực: 08:30 - 16:45 (T2 - T7).
-                </p>
-              </div>
-
-              <div className="border-l-3 border-indigo-500 pl-3 py-1">
-                <p className="font-bold text-slate-900">Campus Hà Nội (Hòa Lạc)</p>
-                <p className="text-slate-500 text-[11px] mt-0.5">
-                  Sảnh Beta Hall (Khu Vực Sinh Viên). Giờ trực: 08:30 - 16:45 (T2 - T7).
                 </p>
               </div>
             </div>

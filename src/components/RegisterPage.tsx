@@ -223,50 +223,14 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
               </div>
             )}
 
-            {/* Role selector */}
+            {/* Role indicator (Chỉ đăng ký vai trò Khách hàng / Sinh viên FPT) */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                <span>Vai Trò Đăng Ký:</span>
-                <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRole('CUSTOMER');
-                    if (studentId.startsWith('TECH-')) setStudentId('');
-                  }}
-                  className={`p-3 rounded-xl border text-xs font-bold transition-all text-left flex items-center gap-2 ${
-                    role === 'CUSTOMER'
-                      ? 'border-[#f26f21] bg-orange-50 text-[#f26f21] ring-2 ring-[#f26f21]/20'
-                      : 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="text-lg">👨‍🎓</span>
-                  <div>
-                    <span className="block font-bold">Sinh Viên FPT</span>
-                    <span className="text-[10px] text-slate-500 font-normal">Đặt lịch & Xem tiến độ</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRole('TECHNICIAN');
-                    if (!studentId || studentId.startsWith('SE')) setStudentId('TECH-FPT-01');
-                  }}
-                  className={`p-3 rounded-xl border text-xs font-bold transition-all text-left flex items-center gap-2 ${
-                    role === 'TECHNICIAN'
-                      ? 'border-[#0b1c30] bg-[#0b1c30] text-white shadow-xs'
-                      : 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="text-lg">🔧</span>
-                  <div>
-                    <span className="block font-bold">Kỹ Thuật Viên</span>
-                    <span className="text-[10px] text-slate-300 font-normal">Workspace trực trạm</span>
-                  </div>
-                </button>
+              <div className="p-3 rounded-xl bg-orange-50/80 border border-orange-200 flex items-center gap-3">
+                <span className="text-2xl">👨‍🎓</span>
+                <div>
+                  <span className="block font-bold text-xs text-[#0b1c30]">Tài Khoản Sinh Viên FPT (Khách Hàng)</span>
+                  <span className="text-[11px] text-slate-500">Đặt lịch vệ sinh AirPods, xuất vé hẹn QR Pass và xem E-Receipt</span>
+                </div>
               </div>
             </div>
 
@@ -415,8 +379,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
                   onChange={(e) => setCampus(e.target.value)}
                   className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#f26f21] focus:outline-none"
                 >
-                  <option value="ĐH FPT TP.HCM (Campus Q.9)">FPT TP.HCM (Campus Q.9)</option>
-                  <option value="ĐH FPT Hà Nội (Hòa Lạc)">FPT Hà Nội (Hòa Lạc)</option>
+                  <option value="ĐH FPT TP.HCM (Campus Q.9)">ĐH FPT TP.HCM (Campus Q.9)</option>
                 </select>
               </div>
             </div>

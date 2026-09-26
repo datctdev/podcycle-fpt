@@ -48,19 +48,13 @@ export const SYSTEM_SERVICES: ServiceItem[] = [
   }
 ];
 
-// 2. Danh sách cơ sở / Bàn trực tiếp nhận FPT Campus
+// 2. Danh sách cơ sở / Bàn trực tiếp nhận FPT Campus (Chỉ phục vụ tại FPT TP.HCM Campus Q.9)
 export const SYSTEM_CAMPUSES = [
   {
     id: 'fpt-hcm',
     name: 'ĐH FPT TP.HCM (Campus Q.9)',
     address: 'Đường D1, Khu Công Nghệ Cao, Long Thạnh Mỹ, TP. Thủ Đức',
     spot: 'Trạm Bàn Giao: Bàn Trực Sảnh Tự Học Tòa Nhà A (Cạnh Canteen)'
-  },
-  {
-    id: 'fpt-hn',
-    name: 'ĐH FPT Hà Nội (Campus Hòa Lạc)',
-    address: 'Khu CNC Hòa Lạc, Km29 Đại lộ Thăng Long, Thạch Thất, Hà Nội',
-    spot: 'Trạm Bàn Giao: Sảnh Beta Hall (Khu Vực Sinh Viên)'
   }
 ];
 
