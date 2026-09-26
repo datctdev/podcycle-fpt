@@ -1,6 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Booking, BookingStatus, User } from '../types';
-import { INITIAL_SEED_BOOKINGS } from './dataInit';
 
 export interface BankConfig {
   bankId: string;       // e.g. 'MB', 'VCB', 'TCB', 'TPB', 'ACB', 'BIDV', 'ICB'
@@ -10,10 +9,10 @@ export interface BankConfig {
 }
 
 export const DEFAULT_BANK_CONFIG: BankConfig = {
-  bankId: 'MB',
-  accountNo: '0388889999',
+  bankId: 'TPB',
+  accountNo: '07478087601',
   accountName: 'CHAU THANH DAT',
-  bankName: 'MB Bank (Quân Đội)'
+  bankName: 'TPBank (Tiên Phong)'
 };
 
 // Available banks in Vietnam
@@ -63,32 +62,265 @@ export const generateRealVietQR = (
   return `https://img.vietqr.io/image/${cleanBank}-${cleanAcc}-compact.png?amount=${amount}&addInfo=${cleanMemo}&accountName=${cleanName}`;
 };
 
-// Supabase Configuration
+// ==============================================================
+// THIẾT LẬP KẾT NỐI SUPABASE CLOUD POSTGRESQL (KHÔNG SỬ DỤNG FALLBACK)
+// ==============================================================
 let supabase: SupabaseClient | null = null;
 
 export const getSupabaseConfig = () => {
-  const url = import.meta.env.VITE_SUPABASE_URL || localStorage.getItem('ttn_supabase_url') || '';
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('ttn_supabase_key') || '';
+  const url = (import.meta.env.VITE_SUPABASE_URL || localStorage.getItem('ttn_supabase_url') || '').trim();
+  const key = (import.meta.env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('ttn_supabase_key') || '').trim();
   return { url, key };
 };
 
-export const initSupabase = () => {
+export const isSupabaseConfigured = (): boolean => {
   const { url, key } = getSupabaseConfig();
-  if (url && key) {
-    try {
-      supabase = createClient(url, key);
-      console.log('[Database] Connected to Supabase Cloud PostgreSQL!');
-      return supabase;
-    } catch (err) {
-      console.warn('[Database] Failed to init Supabase:', err);
-    }
-  }
-  return null;
+  return Boolean(
+    url &&
+    key &&
+    url.startsWith('https://') &&
+    !url.includes('your-project-id') &&
+    !key.includes('your-anon-key')
+  );
 };
 
-// SQL Schema for user to copy-paste into Supabase SQL Editor if they create a new project
+export const initSupabase = (): SupabaseClient => {
+  const { url, key } = getSupabaseConfig();
+
+  if (!url || !key) {
+    throw new Error(
+      'Chưa cấu hình Cơ sở dữ liệu Supabase! Vui lòng điền VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY trong file .env (hoặc bấm vào biểu tượng bánh răng trên thanh tiêu đề).'
+    );
+  }
+
+  if (url.includes('your-project-id') || key.includes('your-anon-key')) {
+    throw new Error(
+      'File .env đang chứa khóa mẫu mặc định. Vui lòng thay thế bằng URL và Anon Key thực tế từ dự án Supabase của bạn tại https://supabase.com.'
+    );
+  }
+
+  if (!supabase) {
+    try {
+      supabase = createClient(url, key, {
+        auth: {
+          persistSession: false
+        }
+      });
+      console.log('[Database] Connected strictly to Supabase Cloud PostgreSQL.');
+    } catch (err: any) {
+      throw new Error('Lỗi khởi tạo Supabase Client: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  return supabase;
+};
+
+// ==============================================================
+// REAL DATABASE SERVICE LAYER - KHÔNG CÓ BẤT KỲ FALLBACK LOCAL NÀO
+// ==============================================================
+export const DatabaseService = {
+  /**
+   * Kiểm tra kết nối trực tiếp đến PostgreSQL Supabase
+   */
+  async testConnection(): Promise<{ connected: boolean; latencyMs?: number; error?: string }> {
+    const startTime = Date.now();
+    try {
+      const sb = initSupabase();
+      const { error } = await sb.from('bookings').select('id').limit(1);
+      if (error) {
+        return { connected: false, error: error.message };
+      }
+      return { connected: true, latencyMs: Date.now() - startTime };
+    } catch (err: any) {
+      return { connected: false, error: err.message || 'Không thể kết nối đến Database' };
+    }
+  },
+
+  /**
+   * 1. LẤY DANH SÁCH LỊCH HẸN TRỰC TIẾP TỪ BẢNG BOOKINGS CỦA DATABASE
+   * Nếu có lỗi kết nối, throw Exception thẳng lên UI, KHÔNG fallback mock!
+   */
+  async getBookings(): Promise<Booking[]> {
+    const sb = initSupabase();
+    const { data, error } = await sb
+      .from('bookings')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[Database Error] getBookings failed:', error);
+      throw new Error(`[Database Error] Không thể tải dữ liệu từ PostgreSQL: ${error.message}`);
+    }
+
+    if (!data) return [];
+
+    return data.map((d: any) => ({
+      id: d.id,
+      bookingCode: d.booking_code,
+      userId: d.user_id,
+      customerName: d.customer_name,
+      phone: d.phone,
+      studentId: d.student_id,
+      campus: d.campus,
+      deviceModel: d.device_model,
+      issueNote: d.issue_note,
+      serviceId: d.service_id,
+      serviceName: d.service_name,
+      amount: Number(d.amount),
+      bookingDate: d.booking_date,
+      slotTime: d.slot_time,
+      paymentMethod: d.payment_method,
+      paymentStatus: d.payment_status,
+      status: d.status,
+      technicianName: d.technician_name,
+      soundClarityScore: d.sound_clarity_score,
+      beforePhoto: d.before_photo,
+      afterPhoto: d.after_photo,
+      createdAt: d.created_at,
+      completedAt: d.completed_at
+    }));
+  },
+
+  /**
+   * 2. TẠO ĐƠN ĐẶT LỊCH MỚI TRỰC TIẾP VÀO POSTGRESQL
+   * Bắt buộc ghi thành công vào database mới trả về, KHÔNG fallback local!
+   */
+  async createBooking(booking: Booking): Promise<Booking> {
+    const sb = initSupabase();
+
+    const dbPayload = {
+      id: booking.id,
+      booking_code: booking.bookingCode,
+      user_id: booking.userId || null,
+      customer_name: booking.customerName,
+      phone: booking.phone,
+      student_id: booking.studentId,
+      campus: booking.campus,
+      device_model: booking.deviceModel,
+      issue_note: booking.issueNote || '',
+      service_id: booking.serviceId,
+      service_name: booking.serviceName,
+      amount: booking.amount,
+      booking_date: booking.bookingDate,
+      slot_time: booking.slotTime,
+      payment_method: booking.paymentMethod,
+      payment_status: booking.paymentStatus,
+      status: booking.status,
+      created_at: booking.createdAt || new Date().toISOString()
+    };
+
+    const { error } = await sb.from('bookings').insert([dbPayload]);
+    if (error) {
+      console.error('[Database Error] createBooking failed:', error);
+      throw new Error(`[Database Error] Không thể lưu đơn vào PostgreSQL: ${error.message}`);
+    }
+
+    return booking;
+  },
+
+  /**
+   * 3. CẬP NHẬT TRẠNG THÁI VỆ SINH & ẢNH KIỂM ĐỊNH TRỰC TIẾP VÀO DATABASE
+   */
+  async updateStatus(
+    bookingId: string, 
+    status: BookingStatus, 
+    extraUpdates: Partial<Booking> = {}
+  ): Promise<void> {
+    const sb = initSupabase();
+
+    const updatePayload: any = {
+      status: status
+    };
+    if (extraUpdates.technicianName !== undefined) updatePayload.technician_name = extraUpdates.technicianName;
+    if (extraUpdates.paymentStatus !== undefined) updatePayload.payment_status = extraUpdates.paymentStatus;
+    if (extraUpdates.soundClarityScore !== undefined) updatePayload.sound_clarity_score = extraUpdates.soundClarityScore;
+    if (extraUpdates.beforePhoto !== undefined) updatePayload.before_photo = extraUpdates.beforePhoto;
+    if (extraUpdates.afterPhoto !== undefined) updatePayload.after_photo = extraUpdates.afterPhoto;
+    if (extraUpdates.completedAt !== undefined) updatePayload.completed_at = extraUpdates.completedAt;
+
+    const { error } = await sb
+      .from('bookings')
+      .update(updatePayload)
+      .eq('id', bookingId);
+
+    if (error) {
+      console.error('[Database Error] updateStatus failed:', error);
+      throw new Error(`[Database Error] Không thể cập nhật trạng thái đơn: ${error.message}`);
+    }
+  },
+
+  /**
+   * 4. GỬI PHẢN HỒI / HỖ TRỢ SINH VIÊN TRỰC TIẾP VÀO BẢNG SUPPORT_TICKETS
+   */
+  async createSupportTicket(ticket: {
+    id: string;
+    fullName: string;
+    studentId?: string;
+    phone: string;
+    category: string;
+    message: string;
+  }): Promise<void> {
+    const sb = initSupabase();
+
+    const { error } = await sb.from('support_tickets').insert([
+      {
+        id: ticket.id,
+        full_name: ticket.fullName,
+        student_id: ticket.studentId || null,
+        phone: ticket.phone,
+        category: ticket.category,
+        message: ticket.message,
+        status: 'OPEN',
+        created_at: new Date().toISOString()
+      }
+    ]);
+
+    if (error) {
+      console.error('[Database Error] createSupportTicket failed:', error);
+      throw new Error(`[Database Error] Không thể lưu yêu cầu hỗ trợ: ${error.message}`);
+    }
+  },
+
+  /**
+   * 5. TÍNH TOÁN SLOT KHẢ DỤNG DỰA TRÊN DỮ LIỆU ĐƠN THẬT TỪ DATABASE
+   */
+  calculateSlots(allBookings: Booking[], date: string, campusName: string) {
+    const defaultSlots = [
+      '08:30 - 09:00',
+      '09:15 - 09:45',
+      '10:00 - 10:30',
+      '11:00 - 11:30',
+      '13:00 - 13:30',
+      '13:45 - 14:15',
+      '14:30 - 15:00',
+      '15:30 - 16:00',
+      '16:15 - 16:45'
+    ];
+
+    const MAX_PER_SLOT = 3;
+
+    return defaultSlots.map((time, idx) => {
+      const realBookedCount = allBookings.filter(
+        (b) =>
+          b.bookingDate === date &&
+          b.campus === campusName &&
+          b.slotTime === time &&
+          b.status !== 'CANCELLED'
+      ).length;
+
+      return {
+        id: `slot_${idx + 1}`,
+        time: time,
+        maxCapacity: MAX_PER_SLOT,
+        bookedCount: realBookedCount
+      };
+    });
+  }
+};
+
+// SQL Schema for user to copy-paste into Supabase SQL Editor
 export const SUPABASE_SQL_SCHEMA = `
--- 1. BẢNG USERS (Xác thực tài khoản Sinh viên & Kỹ thuật viên)
+-- 1. BẢNG APP_USERS (Tài khoản)
 CREATE TABLE IF NOT EXISTS app_users (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
@@ -96,13 +328,13 @@ CREATE TABLE IF NOT EXISTS app_users (
   full_name TEXT NOT NULL,
   phone TEXT NOT NULL UNIQUE,
   student_id TEXT,
-  role TEXT NOT NULL DEFAULT 'CUSTOMER', -- 'CUSTOMER' hoặc 'TECHNICIAN'
+  role TEXT NOT NULL DEFAULT 'CUSTOMER',
   campus TEXT NOT NULL,
   avatar TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. BẢNG BOOKINGS (Đơn đặt lịch & Hồ sơ kiểm định âm học)
+-- 2. BẢNG BOOKINGS (Lịch hẹn & kiểm định âm học)
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   booking_code TEXT NOT NULL UNIQUE,
@@ -123,183 +355,35 @@ CREATE TABLE IF NOT EXISTS bookings (
   status TEXT NOT NULL,
   technician_name TEXT,
   sound_clarity_score INTEGER DEFAULT 98,
+  before_photo TEXT,
+  after_photo TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
 
--- 3. Kích hoạt Realtime cho cả 2 bảng
+-- 3. BẢNG SUPPORT_TICKETS (Phản hồi sinh viên)
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  student_id TEXT,
+  phone TEXT NOT NULL,
+  category TEXT NOT NULL,
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'OPEN',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Kích hoạt Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE app_users;
 ALTER PUBLICATION supabase_realtime ADD TABLE bookings;
+ALTER PUBLICATION supabase_realtime ADD TABLE support_tickets;
 
--- 4. Thêm tài khoản mẫu kiểm thử
-INSERT INTO app_users (id, email, password_hash, full_name, phone, student_id, role, campus, avatar)
-VALUES 
-  ('usr_student_1', 'datct.se18@fpt.edu.vn', '123456', 'Châu Thành Đạt', '0901234567', 'SE180123', 'CUSTOMER', 'ĐH FPT TP.HCM (Campus Q.9)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'),
-  ('usr_tech_1', 'technician@fpt.edu.vn', '123456', 'Nguyễn Văn Minh (Kỹ Thuật Viên Trưởng Ca)', '0988776655', 'TECH-FPT-01', 'TECHNICIAN', 'ĐH FPT TP.HCM (Campus Q.9)', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80')
-ON CONFLICT (email) DO NOTHING;
+-- 5. Quyền truy cập mở (Public RLS)
+ALTER TABLE app_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public app_users" ON app_users FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public bookings" ON bookings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public support_tickets" ON support_tickets FOR ALL USING (true) WITH CHECK (true);
 `;
 
-// Real Database Service Layer
-export const DatabaseService = {
-  // 1. Fetch all bookings
-  async getBookings(): Promise<Booking[]> {
-    const sb = initSupabase();
-    if (sb) {
-      try {
-        const { data, error } = await sb
-          .from('bookings')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          // Map DB snake_case to frontend camelCase
-          return data.map((d: any) => ({
-            id: d.id,
-            bookingCode: d.booking_code,
-            userId: d.user_id,
-            customerName: d.customer_name,
-            phone: d.phone,
-            studentId: d.student_id,
-            campus: d.campus,
-            deviceModel: d.device_model,
-            issueNote: d.issue_note,
-            serviceId: d.service_id,
-            serviceName: d.service_name,
-            amount: Number(d.amount),
-            bookingDate: d.booking_date,
-            slotTime: d.slot_time,
-            paymentMethod: d.payment_method,
-            paymentStatus: d.payment_status,
-            status: d.status,
-            technicianName: d.technician_name,
-            soundClarityScore: d.sound_clarity_score,
-            beforePhoto: d.before_photo,
-            afterPhoto: d.after_photo,
-            createdAt: d.created_at,
-            completedAt: d.completed_at
-          }));
-        }
-      } catch (err) {
-        console.warn('Supabase fetch failed, falling back to local cache:', err);
-      }
-    }
-
-    // Local fallback
-    try {
-      const local = localStorage.getItem('podcycle_bookings');
-      if (local) return JSON.parse(local);
-    } catch {}
-    return INITIAL_SEED_BOOKINGS;
-  },
-
-  // 2. Create new booking
-  async createBooking(booking: Booking): Promise<Booking> {
-    const sb = initSupabase();
-    if (sb) {
-      try {
-        const dbPayload = {
-          id: booking.id,
-          booking_code: booking.bookingCode,
-          user_id: booking.userId,
-          customer_name: booking.customerName,
-          phone: booking.phone,
-          student_id: booking.studentId,
-          campus: booking.campus,
-          device_model: booking.deviceModel,
-          issue_note: booking.issueNote,
-          service_id: booking.serviceId,
-          service_name: booking.serviceName,
-          amount: booking.amount,
-          booking_date: booking.bookingDate,
-          slot_time: booking.slotTime,
-          payment_method: booking.paymentMethod,
-          payment_status: booking.paymentStatus,
-          status: booking.status,
-          created_at: booking.createdAt
-        };
-
-        const { error } = await sb.from('bookings').insert([dbPayload]);
-        if (error) console.warn('Supabase insert warning:', error);
-      } catch (err) {
-        console.warn('Supabase insert failed:', err);
-      }
-    }
-
-    // Always update local cache
-    try {
-      const existing: Booking[] = JSON.parse(localStorage.getItem('podcycle_bookings') || '[]');
-      const updated = [booking, ...existing.filter(b => b.id !== booking.id)];
-      localStorage.setItem('podcycle_bookings', JSON.stringify(updated));
-    } catch {}
-
-    return booking;
-  },
-
-  // 3. Update status
-  async updateStatus(
-    bookingId: string, 
-    status: BookingStatus, 
-    extraUpdates: Partial<Booking> = {}
-  ): Promise<void> {
-    const sb = initSupabase();
-    if (sb) {
-      try {
-        const updatePayload: any = {
-          status: status
-        };
-        if (extraUpdates.technicianName) updatePayload.technician_name = extraUpdates.technicianName;
-        if (extraUpdates.paymentStatus) updatePayload.payment_status = extraUpdates.paymentStatus;
-        if (extraUpdates.soundClarityScore) updatePayload.sound_clarity_score = extraUpdates.soundClarityScore;
-        if (extraUpdates.beforePhoto) updatePayload.before_photo = extraUpdates.beforePhoto;
-        if (extraUpdates.afterPhoto) updatePayload.after_photo = extraUpdates.afterPhoto;
-        if (extraUpdates.completedAt) updatePayload.completed_at = extraUpdates.completedAt;
-
-        await sb.from('bookings').update(updatePayload).eq('id', bookingId);
-      } catch (err) {
-        console.warn('Supabase status update failed:', err);
-      }
-    }
-
-    // Always update local cache
-    try {
-      const existing: Booking[] = JSON.parse(localStorage.getItem('podcycle_bookings') || '[]');
-      const updated = existing.map(b => b.id === bookingId ? { ...b, status, ...extraUpdates } : b);
-      localStorage.setItem('podcycle_bookings', JSON.stringify(updated));
-    } catch {}
-  },
-
-  // 4. Calculate REAL Dynamic Slot Capacities from actual bookings!
-  calculateSlots(allBookings: Booking[], date: string, campusName: string) {
-    const defaultSlots = [
-      '08:30 - 09:00',
-      '09:15 - 09:45',
-      '10:00 - 10:30',
-      '11:00 - 11:30',
-      '13:00 - 13:30',
-      '13:45 - 14:15',
-      '14:30 - 15:00',
-      '15:30 - 16:00',
-      '16:15 - 16:45'
-    ];
-
-    const MAX_PER_SLOT = 3;
-
-    return defaultSlots.map((time, idx) => {
-      // Count real active bookings for this slot on this date & campus
-      const realBookedCount = allBookings.filter(
-        (b) =>
-          b.bookingDate === date &&
-          b.campus === campusName &&
-          b.slotTime === time &&
-          b.status !== 'CANCELLED'
-      ).length;
-
-      return {
-        id: `slot_${idx + 1}`,
-        time: time,
-        maxCapacity: MAX_PER_SLOT,
-        bookedCount: realBookedCount
-      };
-    });
-  }
-};

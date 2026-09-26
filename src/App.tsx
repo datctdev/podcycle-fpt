@@ -22,7 +22,6 @@ import { SettingsModal } from './components/SettingsModal';
 import { ContactPage } from './components/ContactPage';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 
-import { INITIAL_SEED_BOOKINGS } from './services/dataInit';
 import { Booking, ServiceItem, BookingStatus, User } from './types';
 import { trackEvent } from './utils/analytics';
 import { DatabaseService } from './services/db';
@@ -138,16 +137,10 @@ export function App() {
     return null;
   });
 
-  // Persistent Bookings State
-  const [bookings, setBookings] = useState<Booking[]>(() => {
-    try {
-      const saved = localStorage.getItem('podcycle_bookings');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore
-    }
-    return INITIAL_SEED_BOOKINGS;
-  });
+  // REAL DATABASE STATE: Bắt buộc lấy từ PostgreSQL Supabase, ZERO fallback mock/localStorage!
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [dbStatus, setDbStatus] = useState<'CONNECTING' | 'CONNECTED' | 'ERROR'>('CONNECTING');
+  const [dbErrorMessage, setDbErrorMessage] = useState<string>('');
 
   // MANDATORY AUTH GUARD: Force redirect to /login if not authenticated (except public routes)
   useEffect(() => {
@@ -161,22 +154,26 @@ export function App() {
     }
   }, [currentUser, location.pathname]);
 
-  // Hydrate from DatabaseService on mount
-  useEffect(() => {
-    DatabaseService.getBookings().then((fetched) => {
-      if (fetched && fetched.length > 0) {
+  // Hàm load dữ liệu trực tiếp từ PostgreSQL Supabase
+  const refreshBookingsFromDatabase = () => {
+    setDbStatus('CONNECTING');
+    DatabaseService.getBookings()
+      .then((fetched) => {
         setBookings(fetched);
-      }
-    });
-  }, []);
+        setDbStatus('CONNECTED');
+        setDbErrorMessage('');
+      })
+      .catch((err: any) => {
+        setDbStatus('ERROR');
+        setDbErrorMessage(err.message || 'Lỗi kết nối cơ sở dữ liệu Supabase.');
+        console.error('[App] Database error:', err);
+      });
+  };
 
+  // Hydrate directly from Database on mount
   useEffect(() => {
-    try {
-      localStorage.setItem('podcycle_bookings', JSON.stringify(bookings));
-    } catch {
-      // ignore
-    }
-  }, [bookings]);
+    refreshBookingsFromDatabase();
+  }, []);
 
   useEffect(() => {
     try {
@@ -257,28 +254,37 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Booking creation
-  const handleBookingCreated = (newBooking: Booking) => {
-    DatabaseService.createBooking(newBooking);
-    setBookings((prev) => [newBooking, ...prev]);
-    setActiveBooking(newBooking);
-    playStationNotification('new_booking');
-    navigate(`/detail/${newBooking.bookingCode}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Booking creation - Ghi trực tiếp vào PostgreSQL (Không fallback!)
+  const handleBookingCreated = async (newBooking: Booking) => {
+    try {
+      const saved = await DatabaseService.createBooking(newBooking);
+      setBookings((prev) => [saved, ...prev]);
+      setActiveBooking(saved);
+      playStationNotification('new_booking');
+      navigate(`/detail/${saved.bookingCode}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      alert(`[Lỗi Cơ Sở Dữ Liệu] Không thể tạo đơn: ${err.message}`);
+    }
   };
 
-  // Technician / Status Updates
-  const handleUpdateStatus = (
+  // Technician / Status Updates - Cập nhật trực tiếp vào PostgreSQL
+  const handleUpdateStatus = async (
     bookingId: string, 
     newStatus: BookingStatus, 
     updates?: Partial<Booking>
   ) => {
-    DatabaseService.updateStatus(bookingId, newStatus, updates);
-    setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus, ...updates } : b))
-    );
-    if (activeBooking && activeBooking.id === bookingId) {
-      setActiveBooking((prev) => (prev ? { ...prev, status: newStatus, ...updates } : null));
+    try {
+      await DatabaseService.updateStatus(bookingId, newStatus, updates);
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus, ...updates } : b))
+      );
+      if (activeBooking && activeBooking.id === bookingId) {
+        setActiveBooking((prev) => (prev ? { ...prev, status: newStatus, ...updates } : null));
+      }
+      playStationNotification('complete');
+    } catch (err: any) {
+      alert(`[Lỗi Cơ Sở Dữ Liệu] Không thể cập nhật trạng thái: ${err.message}`);
     }
   };
 
@@ -317,6 +323,23 @@ export function App() {
           bookingCount={activeCount}
           onOpenSettings={() => setIsSettingsOpen(true)}
         />
+      )}
+
+      {/* Real Database Connection Alert Banner */}
+      {dbStatus === 'ERROR' && !isAuthPage && (
+        <div className="bg-red-600 text-white text-xs px-4 py-2 flex items-center justify-between shadow-md z-40 fixed top-16 left-0 right-0">
+          <div className="flex items-center gap-2 max-w-4xl mx-auto w-full">
+            <span className="material-symbols-outlined text-[18px] shrink-0">database</span>
+            <span className="font-bold shrink-0">DATABASE THỰC:</span>
+            <span className="truncate">{dbErrorMessage}</span>
+          </div>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="bg-white text-red-700 px-3 py-1 rounded-lg font-bold text-[11px] shrink-0 hover:bg-red-50 ml-2"
+          >
+            Cấu hình Supabase
+          </button>
+        </div>
       )}
 
       {/* Main Body with Real React Router */}
@@ -534,9 +557,7 @@ export function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        onSaved={() => {
-          DatabaseService.getBookings().then(setBookings);
-        }}
+        onSaved={refreshBookingsFromDatabase}
       />
 
       {/* Floating GA4 Live Inspector */}

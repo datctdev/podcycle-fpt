@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { trackEvent } from '../utils/analytics';
 import { User } from '../types';
+import { DatabaseService } from '../services/db';
 
 interface ContactPageProps {
   currentUser?: User | null;
@@ -17,7 +18,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ currentUser, onBackToH
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -35,14 +36,11 @@ export const ContactPage: React.FC<ContactPageProps> = ({ currentUser, onBackToH
         studentId: studentId.trim(),
         phone: phone.trim(),
         category,
-        message: message.trim(),
-        createdAt: new Date().toISOString(),
-        status: 'OPEN'
+        message: message.trim()
       };
 
-      const existing = JSON.parse(localStorage.getItem('podcycle_support_tickets') || '[]');
-      existing.unshift(ticket);
-      localStorage.setItem('podcycle_support_tickets', JSON.stringify(existing));
+      // Ghi trực tiếp vào Database PostgreSQL (Không fallback!)
+      await DatabaseService.createSupportTicket(ticket);
 
       // Track analytics event
       trackEvent('contact_submit', {
@@ -55,7 +53,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ currentUser, onBackToH
       setIsSubmitted(true);
     } catch (err: any) {
       setIsSubmitting(false);
-      setError('Không thể gửi yêu cầu: ' + (err.message || 'Lỗi không xác định'));
+      setError('Không thể gửi yêu cầu lên Cơ sở dữ liệu: ' + (err.message || 'Lỗi kết nối'));
     }
   };
 

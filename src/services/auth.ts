@@ -51,7 +51,6 @@ export const AuthValidator = {
       return 'Email không được để trống.';
     }
     const clean = email.trim().toLowerCase();
-    // RFC 5322 standard email regex
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     if (!emailRegex.test(clean)) {
       return 'Định dạng email không hợp lệ (Ví dụ: name@fpt.edu.vn hoặc user@gmail.com).';
@@ -64,7 +63,6 @@ export const AuthValidator = {
       return 'Số điện thoại không được để trống.';
     }
     const clean = phone.trim();
-    // Vietnamese standard 10-digit mobile phone regex (03, 05, 07, 08, 09)
     const phoneRegex = /^(0)(3|5|7|8|9)[0-9]{8}$/;
     if (!phoneRegex.test(clean)) {
       return 'Số điện thoại không hợp lệ. Phải là 10 chữ số bắt đầu bằng 03, 05, 07, 08, hoặc 09.';
@@ -78,7 +76,6 @@ export const AuthValidator = {
         return 'Mã số sinh viên (MSSV) không được để trống.';
       }
       const clean = studentId.trim().toUpperCase();
-      // FPT Student ID format: SE, IA, SS, SB, GD, DS followed by 6 digits
       const fptRegex = /^[A-Z]{2}[0-9]{6}$/;
       if (!fptRegex.test(clean)) {
         return 'MSSV FPT phải gồm 2 chữ cái và 6 số (Ví dụ: SE180123, IA170999, SS190222).';
@@ -116,27 +113,8 @@ export const AuthValidator = {
 };
 
 // ==========================================
-// 2. TẦNG QUẢN LÝ DỮ LIỆU & CALL API THỰC TẾ
+// 2. MÃ HÓA MẬT KHẨU WEB CRYPTO API SHA-256 + SALT
 // ==========================================
-
-const LOCAL_USERS_KEY = 'ttn_registered_users_db';
-
-// Helper: Lấy danh sách người dùng lưu trữ nội bộ
-function getLocalUsers(): (User & { passwordHash: string })[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_USERS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (err) {
-    console.warn('Cannot read local users', err);
-  }
-  return [];
-}
-
-function saveLocalUsers(users: (User & { passwordHash: string })[]) {
-  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
-}
-
-// Production Web Crypto API SHA-256 Password Hashing with Salt
 export async function hashPassword(password: string): Promise<string> {
   const salt = 'PODCYCLE_FPT_SECURE_SALT_2026_';
   const encoder = new TextEncoder();
@@ -154,15 +132,15 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   return computed === storedHash;
 }
 
+// ==========================================
+// 3. AUTH SERVICE THỰC TẾ (100% SUPABASE POSTGRESQL - KHÔNG CÓ FALLBACK)
+// ==========================================
 export const AuthService = {
   /**
-   * ĐĂNG KÝ TÀI KHOẢN MỚI
-   * 1. Validate toàn bộ field
-   * 2. Gọi API Supabase / kiểm tra trùng lặp
-   * 3. Lưu dữ liệu an toàn
+   * ĐĂNG KÝ TÀI KHOẢN MỚI TRỰC TIẾP VÀO POSTGRESQL
    */
   async register(payload: RegisterPayload): Promise<AuthResponse> {
-    // 1. Kiểm tra validation
+    // 1. Kiểm tra validation form
     const nameErr = AuthValidator.validateFullName(payload.fullName);
     if (nameErr) return { success: false, error: nameErr };
 
@@ -182,106 +160,96 @@ export const AuthService = {
     const cleanPhone = payload.phone.trim();
     const cleanStudentId = payload.studentId.trim().toUpperCase();
 
-    // 2. Thử gọi API Supabase Cloud nếu có cấu hình
-    const sb = initSupabase();
-    if (sb) {
-      try {
-        // Kiểm tra xem email hoặc sđt đã tồn tại trong database chưa
-        const { data: existingUser, error: checkErr } = await sb
-          .from('app_users')
-          .select('id, email, phone')
-          .or(`email.eq.${cleanEmail},phone.eq.${cleanPhone}`)
-          .maybeSingle();
-
-        if (existingUser) {
-          if (existingUser.email?.toLowerCase() === cleanEmail) {
-            return { success: false, error: 'Email này đã được đăng ký trên hệ thống. Vui lòng đăng nhập hoặc dùng email khác.' };
-          }
-          if (existingUser.phone === cleanPhone) {
-            return { success: false, error: 'Số điện thoại này đã được đăng ký cho một tài khoản khác.' };
-          }
-        }
-
-        // Hash mật khẩu với SHA-256 + Salt
-        const hashedPw = await hashPassword(payload.password);
-
-        // Tạo tài khoản trên Supabase
-        const newUserId = 'usr_' + Date.now();
-        const avatar = payload.role === 'CUSTOMER'
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80';
-
-        const { error: insertErr } = await sb.from('app_users').insert([
-          {
-            id: newUserId,
-            email: cleanEmail,
-            password_hash: hashedPw,
-            full_name: payload.fullName.trim(),
-            phone: cleanPhone,
-            student_id: cleanStudentId,
-            role: payload.role,
-            campus: payload.campus,
-            avatar: avatar,
-            created_at: new Date().toISOString()
-          }
-        ]);
-
-        if (insertErr) {
-          console.warn('Supabase app_users insert error:', insertErr);
-        } else {
-          console.log('[API Auth] Registered new user in Supabase successfully!');
-        }
-      } catch (err: any) {
-        console.warn('API error when calling Supabase register:', err);
-      }
+    // 2. Gọi trực tiếp Supabase Database (Không fallback!)
+    let sb;
+    try {
+      sb = initSupabase();
+    } catch (err: any) {
+      return {
+        success: false,
+        error: `[Database Connection Error] ${err.message}`
+      };
     }
 
-    // 3. Đồng bộ vào Local Storage Database
-    const localList = getLocalUsers();
-    const existing = localList.find(
-      u => u.email.toLowerCase() === cleanEmail || u.phone === cleanPhone
-    );
+    try {
+      // Kiểm tra trùng lặp email hoặc phone
+      const { data: existingUser, error: checkErr } = await sb
+        .from('app_users')
+        .select('id, email, phone')
+        .or(`email.eq.${cleanEmail},phone.eq.${cleanPhone}`)
+        .maybeSingle();
 
-    if (existing) {
-      if (existing.email.toLowerCase() === cleanEmail) {
-        return { success: false, error: 'Email này đã được đăng ký. Vui lòng đăng nhập.' };
+      if (checkErr) {
+        return {
+          success: false,
+          error: `[Database Error] Không thể kiểm tra tài khoản: ${checkErr.message}`
+        };
       }
-      if (existing.phone === cleanPhone) {
-        return { success: false, error: 'Số điện thoại này đã được sử dụng cho tài khoản khác.' };
-      }
-    }
 
-    const newUser: User = {
-      id: 'usr_' + Date.now(),
-      fullName: payload.fullName.trim(),
-      email: cleanEmail,
-      phone: cleanPhone,
-      studentId: cleanStudentId,
-      role: payload.role,
-      campus: payload.campus,
-      avatar: payload.role === 'CUSTOMER'
+      if (existingUser) {
+        if (existingUser.email?.toLowerCase() === cleanEmail) {
+          return { success: false, error: 'Email này đã tồn tại trong cơ sở dữ liệu. Vui lòng đăng nhập.' };
+        }
+        if (existingUser.phone === cleanPhone) {
+          return { success: false, error: 'Số điện thoại này đã được sử dụng trong cơ sở dữ liệu.' };
+        }
+      }
+
+      // Hash mật khẩu
+      const hashedPw = await hashPassword(payload.password);
+      const newUserId = 'usr_' + Date.now();
+      const avatar = payload.role === 'CUSTOMER'
         ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
-        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80'
-    };
+        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80';
 
-    const localHashedPw = await hashPassword(payload.password);
-    localList.push({
-      ...newUser,
-      passwordHash: localHashedPw
-    });
-    saveLocalUsers(localList);
+      const newUser: User = {
+        id: newUserId,
+        fullName: payload.fullName.trim(),
+        email: cleanEmail,
+        phone: cleanPhone,
+        studentId: cleanStudentId,
+        role: payload.role,
+        campus: payload.campus,
+        avatar: avatar
+      };
 
-    return {
-      success: true,
-      user: newUser
-    };
+      // Ghi trực tiếp vào bảng app_users trong PostgreSQL
+      const { error: insertErr } = await sb.from('app_users').insert([
+        {
+          id: newUserId,
+          email: cleanEmail,
+          password_hash: hashedPw,
+          full_name: payload.fullName.trim(),
+          phone: cleanPhone,
+          student_id: cleanStudentId,
+          role: payload.role,
+          campus: payload.campus,
+          avatar: avatar,
+          created_at: new Date().toISOString()
+        }
+      ]);
+
+      if (insertErr) {
+        return {
+          success: false,
+          error: `[Database Insert Error] ${insertErr.message}`
+        };
+      }
+
+      return {
+        success: true,
+        user: newUser
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: `[Database Exception] ${err.message || 'Không thể kết nối đến máy chủ cơ sở dữ liệu'}`
+      };
+    }
   },
 
   /**
-   * ĐĂNG NHẬP
-   * 1. Validate identifier và password
-   * 2. Gọi API xác thực từ Supabase hoặc local store
-   * 3. Trả về đúng mã lỗi (KHÔNG tự sinh mock user!)
+   * ĐĂNG NHẬP TRỰC TIẾP TỪ BẢNG APP_USERS TRONG DATABASE
    */
   async login(identifier: string, password: string): Promise<AuthResponse> {
     if (!identifier || !identifier.trim()) {
@@ -293,75 +261,68 @@ export const AuthService = {
 
     const cleanId = identifier.trim().toLowerCase();
 
-    // 1. Thử xác thực qua Supabase Cloud API
-    const sb = initSupabase();
-    if (sb) {
-      try {
-        const { data: dbUser, error: queryErr } = await sb
-          .from('app_users')
-          .select('*')
-          .or(`email.ilike.${cleanId},phone.eq.${cleanId}`)
-          .maybeSingle();
+    // 1. Kết nối Supabase (Không fallback!)
+    let sb;
+    try {
+      sb = initSupabase();
+    } catch (err: any) {
+      return {
+        success: false,
+        error: `[Database Connection Error] ${err.message}`
+      };
+    }
 
-        if (dbUser) {
-          const isMatch = await verifyPassword(password, dbUser.password_hash);
-          if (isMatch) {
-            const userProfile: User = {
-              id: dbUser.id,
-              fullName: dbUser.full_name,
-              email: dbUser.email,
-              phone: dbUser.phone,
-              studentId: dbUser.student_id,
-              role: dbUser.role as UserRole,
-              campus: dbUser.campus,
-              avatar: dbUser.avatar
-            };
-            return { success: true, user: userProfile };
-          } else {
-            return { success: false, error: 'Mật khẩu không chính xác. Vui lòng kiểm tra lại.' };
-          }
-        }
-      } catch (err) {
-        console.warn('Supabase login check failed, checking local store:', err);
+    try {
+      // 2. Query trực tiếp bảng app_users trong PostgreSQL
+      const { data: dbUser, error: queryErr } = await sb
+        .from('app_users')
+        .select('*')
+        .or(`email.ilike.${cleanId},phone.eq.${cleanId}`)
+        .maybeSingle();
+
+      if (queryErr) {
+        return {
+          success: false,
+          error: `[Database Error] Không thể truy vấn người dùng: ${queryErr.message}`
+        };
       }
-    }
 
-    // 2. Kiểm tra danh sách User trong Database nội bộ
-    const localUsers = getLocalUsers();
-    const found = localUsers.find(
-      u => u.email.toLowerCase() === cleanId || u.phone === cleanId
-    );
+      if (!dbUser) {
+        return {
+          success: false,
+          error: `Tài khoản "${identifier}" không tồn tại trong cơ sở dữ liệu. Vui lòng đăng ký tài khoản mới.`
+        };
+      }
 
-    if (!found) {
+      // 3. Kiểm tra mật khẩu băm
+      const isMatch = await verifyPassword(password, dbUser.password_hash);
+      if (!isMatch) {
+        return {
+          success: false,
+          error: 'Mật khẩu không chính xác. Vui lòng kiểm tra lại.'
+        };
+      }
+
+      const userProfile: User = {
+        id: dbUser.id,
+        fullName: dbUser.full_name,
+        email: dbUser.email,
+        phone: dbUser.phone,
+        studentId: dbUser.student_id,
+        role: dbUser.role as UserRole,
+        campus: dbUser.campus,
+        avatar: dbUser.avatar
+      };
+
+      return {
+        success: true,
+        user: userProfile
+      };
+    } catch (err: any) {
       return {
         success: false,
-        error: `Không tìm thấy tài khoản với "${identifier}". Vui lòng đăng ký tài khoản mới hoặc kiểm tra lại thông tin.`
+        error: `[Database Exception] ${err.message || 'Lỗi truy cập dữ liệu máy chủ'}`
       };
     }
-
-    // Kiểm tra mật khẩu (hỗ trợ cả 123 cho các tài khoản seed)
-    const isLocalMatch = await verifyPassword(password, found.passwordHash);
-    if (!isLocalMatch) {
-      return {
-        success: false,
-        error: 'Mật khẩu không chính xác. Vui lòng thử lại.'
-      };
-    }
-
-    const userProfile: User = {
-      id: found.id,
-      fullName: found.fullName,
-      email: found.email,
-      phone: found.phone,
-      studentId: found.studentId,
-      role: found.role,
-      campus: found.campus,
-      avatar: found.avatar
-    };
-
-    return {
-      success: true,
-      user: userProfile
-    };
   }
 };

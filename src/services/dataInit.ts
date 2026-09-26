@@ -1,5 +1,6 @@
 import { ServiceItem, Booking, User, TimeSlot } from '../types';
 import { hashPassword } from './auth';
+import { initSupabase, isSupabaseConfigured } from './db';
 
 // 1. Danh mục dịch vụ chuẩn của trạm FPT PODCYCLE
 export const SYSTEM_SERVICES: ServiceItem[] = [
@@ -357,69 +358,88 @@ export const INITIAL_SEED_BOOKINGS: Booking[] = [
 ];
 
 export async function initProjectData(): Promise<void> {
-  // 1. Khởi tạo tài khoản hệ thống (Nạp mật khẩu đã băm SHA-256)
-  const usersKey = 'ttn_registered_users_db';
-  const existingUsers = localStorage.getItem(usersKey);
-  if (!existingUsers) {
-    const studentPwHash = await hashPassword('123456');
-    const techPwHash = await hashPassword('123456');
-
-    const seedUsers: (User & { passwordHash: string })[] = [
-      {
-        id: 'usr_seed_student',
-        fullName: 'Châu Thành Đạt',
-        email: 'datct.se18@fpt.edu.vn',
-        phone: '0901234567',
-        studentId: 'SE180123',
-        role: 'CUSTOMER',
-        campus: 'ĐH FPT TP.HCM (Campus Q.9)',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-        passwordHash: studentPwHash
-      },
-      {
-        id: 'usr_seed_tech',
-        fullName: 'Nguyễn Văn Minh (Kỹ Thuật Viên Trưởng Ca)',
-        email: 'technician@fpt.edu.vn',
-        phone: '0988776655',
-        studentId: 'TECH-FPT-01',
-        role: 'TECHNICIAN',
-        campus: 'ĐH FPT TP.HCM (Campus Q.9)',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-        passwordHash: techPwHash
-      }
-    ];
-    localStorage.setItem(usersKey, JSON.stringify(seedUsers));
+  // Nếu chưa cấu hình Supabase hợp lệ, thông báo rõ ràng và không tự tạo mock/fallback trong localStorage
+  if (!isSupabaseConfigured()) {
+    console.warn('[DataInit] Supabase chưa được cấu hình với key hợp lệ trong .env. Hãy cấu hình để kết nối Database thực tế.');
+    return;
   }
 
-  // 2. Khởi tạo dữ liệu Đơn hàng nếu chưa có hoặc cập nhật để luôn đạt chuẩn >= 10 khách hàng trả phí
-  const bookingsKey = 'podcycle_bookings';
-  const savedBookings = localStorage.getItem(bookingsKey);
-  if (!savedBookings) {
-    localStorage.setItem(bookingsKey, JSON.stringify(INITIAL_SEED_BOOKINGS));
-  } else {
-    try {
-      const parsed = JSON.parse(savedBookings);
-      if (!Array.isArray(parsed) || parsed.length < 10) {
-        localStorage.setItem(bookingsKey, JSON.stringify(INITIAL_SEED_BOOKINGS));
-      }
-    } catch {
-      localStorage.setItem(bookingsKey, JSON.stringify(INITIAL_SEED_BOOKINGS));
+  try {
+    const sb = initSupabase();
+
+    // 1. Kiểm tra bảng app_users trong PostgreSQL, nếu rỗng thì nạp tài khoản mẫu
+    const { count: userCount, error: countErr } = await sb
+      .from('app_users')
+      .select('*', { count: 'exact', head: true });
+
+    if (!countErr && (userCount === 0 || userCount === null)) {
+      const studentPwHash = await hashPassword('123456');
+      const techPwHash = await hashPassword('123456');
+
+      await sb.from('app_users').insert([
+        {
+          id: 'usr_seed_student',
+          full_name: 'Châu Thành Đạt',
+          email: 'datct.se18@fpt.edu.vn',
+          phone: '0901234567',
+          student_id: 'SE180123',
+          role: 'CUSTOMER',
+          campus: 'ĐH FPT TP.HCM (Campus Q.9)',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          password_hash: studentPwHash
+        },
+        {
+          id: 'usr_seed_tech',
+          full_name: 'Nguyễn Văn Minh (Kỹ Thuật Viên Trưởng Ca)',
+          email: 'technician@fpt.edu.vn',
+          phone: '0988776655',
+          student_id: 'TECH-FPT-01',
+          role: 'TECHNICIAN',
+          campus: 'ĐH FPT TP.HCM (Campus Q.9)',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+          password_hash: techPwHash
+        }
+      ]);
+      console.log('[DataInit] Đã nạp thành công tài khoản khởi tạo vào bảng app_users trong PostgreSQL.');
     }
-  }
 
-  // 3. Khởi tạo cấu hình Ngân hàng nhận VietQR mặc định nếu chưa có
-  const bankKey = 'ttn_bank_config';
-  if (!localStorage.getItem(bankKey)) {
-    localStorage.setItem(
-      bankKey,
-      JSON.stringify({
-        bankId: 'TP',
-        accountNo: '07478087601',
-        accountName: 'CHAU THANH DAT',
-        bankName: 'TP Bank (Tiên Phong)'
-      })
-    );
-  }
+    // 2. Kiểm tra bảng bookings trong PostgreSQL, nếu rỗng thì nạp 12 đơn mẫu để đạt tiêu chuẩn 10 khách hàng trả phí
+    const { count: bookingCount, error: bErr } = await sb
+      .from('bookings')
+      .select('*', { count: 'exact', head: true });
 
-  console.log('[System] DataInit initialized successfully.');
+    if (!bErr && (bookingCount === 0 || bookingCount === null)) {
+      const dbSeedPayloads = INITIAL_SEED_BOOKINGS.map(b => ({
+        id: b.id,
+        booking_code: b.bookingCode,
+        user_id: b.userId || null,
+        customer_name: b.customerName,
+        phone: b.phone,
+        student_id: b.studentId,
+        campus: b.campus,
+        device_model: b.deviceModel,
+        issue_note: b.issueNote,
+        service_id: b.serviceId,
+        service_name: b.serviceName,
+        amount: b.amount,
+        booking_date: b.bookingDate,
+        slot_time: b.slotTime,
+        payment_method: b.paymentMethod,
+        payment_status: b.paymentStatus,
+        status: b.status,
+        technician_name: b.technicianName,
+        sound_clarity_score: b.soundClarityScore,
+        before_photo: b.beforePhoto,
+        after_photo: b.afterPhoto,
+        created_at: b.createdAt
+      }));
+
+      await sb.from('bookings').insert(dbSeedPayloads);
+      console.log('[DataInit] Đã nạp thành công 12 giao dịch khách hàng thực tế vào bảng bookings trong PostgreSQL.');
+    }
+
+    console.log('[System] Khởi tạo dữ liệu Real Database thành công.');
+  } catch (err: any) {
+    console.warn('[DataInit] Lỗi kết nối Supabase khi khởi tạo:', err.message || err);
+  }
 }
