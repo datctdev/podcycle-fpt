@@ -106,19 +106,21 @@ export class SePayPgClient {
 
       initOneTimePaymentFields: (params: OneTimePaymentParams): SePayCheckoutFormFields => {
         const fields: Record<string, any> = {
-          merchant: this.config.merchant_id,
           operation: 'PURCHASE',
           payment_method: params.payment_method || 'BANK_TRANSFER',
           order_invoice_number: params.order_invoice_number,
           order_amount: Math.round(params.order_amount),
           currency: params.currency || 'VND',
-          order_description: params.order_description || `Thanh toan don hang ${params.order_invoice_number}`,
-          customer_id: params.customer_id,
-          success_url: params.success_url,
-          error_url: params.error_url,
-          cancel_url: params.cancel_url,
-          custom_data: params.custom_data
+          order_description: params.order_description || `Thanh toan don ${params.order_invoice_number}`,
         };
+
+        if (params.customer_id) fields.customer_id = params.customer_id;
+        if (params.success_url) fields.success_url = params.success_url;
+        if (params.error_url) fields.error_url = params.error_url;
+        if (params.cancel_url) fields.cancel_url = params.cancel_url;
+        if (params.custom_data) fields.custom_data = params.custom_data;
+
+        fields.merchant = this.config.merchant_id;
 
         const signature = this.signFields(fields);
         return {
@@ -130,7 +132,7 @@ export class SePayPgClient {
   }
 
   /**
-   * Ký chữ ký HMAC-SHA256 chuẩn đặc tả của SePay Payment Gateway
+   * Ký chữ ký HMAC-SHA256 chuẩn đặc tả của SePay Payment Gateway (sepay-pg-node tương thích 100%)
    */
   private signFields(fields: Record<string, any>): string {
     const signedAllowed = [
@@ -154,18 +156,82 @@ export class SePayPgClient {
       'order_id'
     ];
 
-    const signedParts: string[] = [];
-    for (const key of signedAllowed) {
-      if (fields[key] !== undefined && fields[key] !== null && fields[key] !== '') {
-        signedParts.push(`${key}=${fields[key]}`);
-      }
+    const signed: string[] = [];
+    const signedFields = Object.keys(fields).filter(field => signedAllowed.includes(field));
+    for (const field of signedFields) {
+      if (fields[field] === undefined) continue;
+      signed.push(`${field}=${fields[field] ?? ''}`);
     }
 
-    const payload = signedParts.join(',');
+    const payload = signed.join(',');
     const hash = CryptoJS.HmacSHA256(payload, this.config.secret_key);
     return CryptoJS.enc.Base64.stringify(hash);
   }
 }
+
+/**
+ * Kiểm tra trạng thái thanh toán đơn hàng trực tiếp qua SePay Payment Gateway Order API
+ * Sử dụng Merchant ID & Secret Key (Basic Auth) - Chuẩn SePay PG
+ */
+export const checkSePayPgOrderStatus = async (
+  orderInvoiceNumber: string
+): Promise<{ isPaid: boolean; message?: string; data?: any }> => {
+  const config = getSePayPgConfig();
+  if (!config.merchant_id || !config.secret_key) {
+    return { isPaid: false, message: 'Chưa cấu hình SePay Merchant ID và Secret Key.' };
+  }
+
+  try {
+    const authString = `${config.merchant_id}:${config.secret_key}`;
+    const basicAuth = btoa(authString);
+
+    const res = await fetch(`https://pgapi.sepay.vn/v1/order/detail/${encodeURIComponent(orderInvoiceNumber)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!res.ok) {
+      return { isPaid: false, message: `SePay PG API HTTP ${res.status}` };
+    }
+
+    const result = await res.json();
+    const orderData = result.data;
+    if (!orderData) {
+      return { isPaid: false, message: 'Không tìm thấy dữ liệu đơn hàng trên SePay.' };
+    }
+
+    const isCompleted =
+      orderData.order_status === 'COMPLETED' ||
+      orderData.order_status === 'PAID' ||
+      (Array.isArray(orderData.transactions) &&
+        orderData.transactions.length > 0 &&
+        orderData.transactions.some(
+          (tx: any) => tx.status === 'SUCCESS' || tx.status === 'COMPLETED'
+        ));
+
+    if (isCompleted) {
+      return {
+        isPaid: true,
+        message: `Xác nhận thanh toán thành công qua Cổng SePay (Mã GD: ${orderData.order_id || orderInvoiceNumber})!`,
+        data: orderData
+      };
+    }
+
+    return {
+      isPaid: false,
+      message: 'Đơn hàng đang chờ thanh toán trên cổng SePay...',
+      data: orderData
+    };
+  } catch (err: any) {
+    return {
+      isPaid: false,
+      message: err.message || 'Lỗi khi gọi SePay PG API'
+    };
+  }
+};
 
 // ==============================================================
 // 2. SEPAY TRANSACTION TRA CỨU & AUTO-POLLING API

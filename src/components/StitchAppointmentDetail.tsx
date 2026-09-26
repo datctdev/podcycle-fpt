@@ -6,7 +6,8 @@ import {
   SePayPgClient, 
   getSePayPgConfig, 
   checkSePayPayment,
-  getSePayApiToken
+  getSePayApiToken,
+  checkSePayPgOrderStatus
 } from '../services/sepay';
 
 interface StitchAppointmentDetailProps {
@@ -32,6 +33,12 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
   const [isAutoPolling, setIsAutoPolling] = useState(false);
   const [paymentSuccessNotice, setPaymentSuccessNotice] = useState(booking.paymentStatus === 'PAID');
   const [checkStatusMessage, setCheckStatusMessage] = useState<string>('');
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+
+  const iframeFormRef = React.useRef<HTMLFormElement>(null);
+  const newTabFormRef = React.useRef<HTMLFormElement>(null);
+
+  const isPaid = booking.paymentStatus === 'PAID' || paymentSuccessNotice;
 
   // Khởi tạo SePay Payment Gateway Form Fields (chuẩn Production)
   const pgClient = new SePayPgClient(pgConfig);
@@ -42,34 +49,54 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
     order_amount: booking.amount,
     currency: 'VND',
     order_description: `Thanh toan don hang ${booking.bookingCode}`,
-    success_url: `${window.location.origin}/detail/${booking.bookingCode}?payment=success`,
-    error_url: `${window.location.origin}/detail/${booking.bookingCode}?payment=error`,
-    cancel_url: `${window.location.origin}/detail/${booking.bookingCode}?payment=cancel`,
+    success_url: `${window.location.origin}/?payment=success&code=${booking.bookingCode}`,
+    error_url: `${window.location.origin}/?payment=error&code=${booking.bookingCode}`,
+    cancel_url: `${window.location.origin}/?payment=cancel&code=${booking.bookingCode}`,
   }) : null;
+
+  const handleConfirmPaymentSuccess = (source: string) => {
+    if (paymentSuccessNotice || booking.paymentStatus === 'PAID') return;
+    setPaymentSuccessNotice(true);
+    playStationNotification('complete');
+    if (onConfirmPayment) {
+      onConfirmPayment(booking.id);
+    }
+    trackEvent('purchase', {
+      transaction_id: booking.bookingCode,
+      value: booking.amount,
+      currency: 'VND',
+      payment_type: source
+    });
+  };
 
   // 1. Tự động kiểm tra callback redirect từ Cổng SePay Payment Gateway (?payment=success)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('payment') === 'success' && booking.paymentStatus !== 'PAID' && !paymentSuccessNotice) {
-      setPaymentSuccessNotice(true);
-      playStationNotification('complete');
-      if (onConfirmPayment) {
-        onConfirmPayment(booking.id);
-      }
-      trackEvent('purchase', {
-        transaction_id: booking.bookingCode,
-        value: booking.amount,
-        currency: 'VND',
-        payment_type: 'SEPAY_PG_PRODUCTION'
-      });
+    if (urlParams.get('payment') === 'success' && !isPaid) {
+      handleConfirmPaymentSuccess('SEPAY_PG_CALLBACK');
     }
-  }, [booking.id, booking.bookingCode, booking.amount, booking.paymentStatus, paymentSuccessNotice]);
+  }, [isPaid]);
 
-  // 2. Auto-polling nếu có SePay API Token
+  // 2. Tự động nạp Cổng Thanh Toán SePay & Mã QR vào iframe
   useEffect(() => {
-    if (booking.paymentStatus === 'PAID' || paymentSuccessNotice) return;
+    if (!isPaid && hasPgConfig && checkoutFormfields && iframeFormRef.current) {
+      const timer = setTimeout(() => {
+        try {
+          iframeFormRef.current?.submit();
+          setIframeLoaded(true);
+        } catch (err) {
+          console.error('[SePay Iframe] Submit error:', err);
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [isPaid, hasPgConfig, booking.bookingCode]);
+
+  // 3. Auto-polling kiểm tra thanh toán tự động qua SePay PG Order API & API Token v2
+  useEffect(() => {
+    if (isPaid) return;
     if (booking.paymentMethod !== 'VIETQR') return;
-    if (!sepayApiToken) return;
+    if (!hasPgConfig && !sepayApiToken) return;
 
     let isMounted = true;
     let pollTimer: any = null;
@@ -78,25 +105,23 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
       try {
         if (!isMounted) return;
         setIsAutoPolling(true);
-        const result = await checkSePayPayment(booking.bookingCode, booking.amount);
-        
-        if (!isMounted) return;
-        if (result.isPaid) {
-          setPaymentSuccessNotice(true);
-          playStationNotification('complete');
-          
-          if (onConfirmPayment) {
-            onConfirmPayment(booking.id);
+
+        // A. Kiểm tra trực tiếp qua SePay PG Order API
+        if (hasPgConfig) {
+          const pgRes = await checkSePayPgOrderStatus(booking.bookingCode);
+          if (pgRes.isPaid) {
+            if (isMounted) handleConfirmPaymentSuccess('SEPAY_PG_ORDER_AUTO');
+            return;
           }
+        }
 
-          trackEvent('purchase', {
-            transaction_id: booking.bookingCode,
-            value: booking.amount,
-            currency: 'VND',
-            payment_type: 'SEPAY_AUTO_DETECT'
-          });
-
-          return;
+        // B. Kiểm tra qua SePay API v2 nếu có token
+        if (sepayApiToken) {
+          const result = await checkSePayPayment(booking.bookingCode, booking.amount);
+          if (result.isPaid) {
+            if (isMounted) handleConfirmPaymentSuccess('SEPAY_API_AUTO');
+            return;
+          }
         }
       } catch (err: any) {
         console.warn('[SePay Polling]', err.message);
@@ -104,20 +129,20 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
         if (isMounted) setIsAutoPolling(false);
       }
 
-      if (isMounted && !paymentSuccessNotice && booking.paymentStatus !== 'PAID') {
+      if (isMounted && !isPaid) {
         pollTimer = setTimeout(poll, 4000);
       }
     };
 
-    pollTimer = setTimeout(poll, 2000);
+    pollTimer = setTimeout(poll, 3000);
 
     return () => {
       isMounted = false;
       if (pollTimer) clearTimeout(pollTimer);
     };
-  }, [booking.id, booking.paymentStatus, booking.bookingCode, booking.amount, booking.paymentMethod, paymentSuccessNotice, sepayApiToken]);
+  }, [isPaid, booking.paymentMethod, booking.bookingCode, booking.amount, hasPgConfig, sepayApiToken]);
 
-  // 3. Nút kiểm tra thủ công SePay
+  // 4. Nút kiểm tra thủ công SePay
   const handleManualCheckPayment = async () => {
     if (!hasPgConfig && !sepayApiToken) {
       setCheckStatusMessage('Chưa cấu hình SePay Merchant ID hoặc API Token! Vui lòng bấm vào icon Bánh Răng để thêm cấu hình.');
@@ -129,22 +154,26 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
     setCheckStatusMessage('Đang kết nối SePay Gateway kiểm tra trạng thái thanh toán...');
 
     try {
+      if (hasPgConfig) {
+        const pgRes = await checkSePayPgOrderStatus(booking.bookingCode);
+        if (pgRes.isPaid) {
+          handleConfirmPaymentSuccess('SEPAY_PG_MANUAL');
+          setCheckStatusMessage('');
+          return;
+        }
+      }
+
       if (sepayApiToken) {
         const res = await checkSePayPayment(booking.bookingCode, booking.amount);
         if (res.isPaid) {
-          setPaymentSuccessNotice(true);
-          playStationNotification('complete');
-          if (onConfirmPayment) {
-            onConfirmPayment(booking.id);
-          }
+          handleConfirmPaymentSuccess('SEPAY_TRANSACTION_MANUAL');
           setCheckStatusMessage('');
           return;
         }
       }
       
-      // Nếu chưa có biến động
       setCheckStatusMessage(
-        'Chưa ghi nhận thanh toán hoàn tất trên cổng SePay. Nếu bạn đã hoàn thành giao dịch, vui lòng chờ 5-10 giây để cổng xử lý.'
+        'Chưa ghi nhận thanh toán hoàn tất từ cổng SePay. Nếu bạn đã chuyển khoản thành công, vui lòng chờ 5-10 giây để cổng đồng bộ dữ liệu.'
       );
     } catch (err: any) {
       setCheckStatusMessage('Lỗi kiểm tra SePay: ' + (err.message || 'Lỗi kết nối'));
@@ -152,8 +181,6 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
       setIsManualChecking(false);
     }
   };
-
-  const isPaid = booking.paymentStatus === 'PAID' || paymentSuccessNotice;
 
   return (
     <div className="pt-20 pb-28 px-4 sm:px-6 max-w-2xl mx-auto space-y-4">
@@ -297,51 +324,123 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
           {!isPaid ? (
             <div className="space-y-4">
               
-              {/* Box Thanh Toán Qua SePay Gateway */}
+              {/* Box Thanh Toán Qua SePay Gateway với Mã QR Trực Tiếp */}
               <div className="bg-orange-50/70 p-4 rounded-2xl border border-orange-200 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[#f26f21] text-[26px]">payment</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[#f26f21] text-[24px]">qr_code_2</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-xs text-[#0b1c30]">Mã QR Cổng Thanh Toán SePay (Live)</p>
+                      <p className="text-slate-500 text-[11px]">
+                        Mã đơn: <span className="font-bold text-slate-800">{booking.bookingCode}</span> • Số tiền: <span className="font-bold text-[#f26f21]">{booking.amount.toLocaleString('vi-VN')}đ</span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 text-xs">
-                    <p className="font-bold text-[#0b1c30]">Mã đơn thanh toán: {booking.bookingCode}</p>
-                    <p className="text-slate-500 text-[11px]">Dịch vụ: {booking.serviceName}</p>
-                    <p className="text-[#f26f21] font-extrabold text-base mt-0.5">
-                      {booking.amount.toLocaleString('vi-VN')}đ
-                    </p>
-                  </div>
-                </div>
 
-                <div className="text-[11px] text-slate-600 bg-white p-3 rounded-xl border border-orange-200/60 space-y-1">
-                  <p className="font-semibold text-slate-800 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px] text-emerald-600">shield</span>
-                    <span>Thanh toán an toàn qua Cổng SePay (Production):</span>
-                  </p>
-                  <p className="text-slate-500">
-                    Bấm nút bên dưới để mở giao diện cổng thanh toán chính thức của SePay. Bạn có thể quét mã VietQR Napas 24/7 từ bất kỳ App ngân hàng nào để thanh toán tự động.
-                  </p>
-                </div>
-
-                {/* Form POST SePay Payment Gateway */}
-                {hasPgConfig && checkoutFormfields ? (
-                  <form action={checkoutURL} method="POST" target="_blank" className="w-full pt-1">
-                    {Object.keys(checkoutFormfields).map((field) => (
-                      <input
-                        key={field}
-                        type="hidden"
-                        name={field}
-                        value={checkoutFormfields[field]}
-                      />
-                    ))}
+                  {hasPgConfig && checkoutFormfields && (
                     <button
-                      type="submit"
-                      className="w-full fpt-gradient fpt-gradient-hover text-white font-bold text-xs py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+                      type="button"
+                      onClick={() => newTabFormRef.current?.submit()}
+                      className="text-[11px] font-bold text-[#f26f21] hover:text-orange-700 bg-white border border-orange-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                      title="Mở cổng SePay trong tab mới"
                     >
-                      <span className="material-symbols-outlined text-[18px]">lock</span>
-                      <span>Mở Cổng Thanh Toán SePay (Pay Now • {booking.amount.toLocaleString('vi-VN')}đ)</span>
-                      <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                      <span>Mở tab mới</span>
+                      <span className="material-symbols-outlined text-[14px]">open_in_new</span>
                     </button>
-                  </form>
+                  )}
+                </div>
+
+                {/* Các Form POST ẩn gửi dữ liệu bảo mật sang SePay PG */}
+                {hasPgConfig && checkoutFormfields ? (
+                  <>
+                    <form
+                      ref={iframeFormRef}
+                      action={checkoutURL}
+                      method="POST"
+                      target="sepay_checkout_frame"
+                      className="hidden"
+                    >
+                      {Object.keys(checkoutFormfields).map((field) => (
+                        <input
+                          key={field}
+                          type="hidden"
+                          name={field}
+                          value={checkoutFormfields[field]}
+                        />
+                      ))}
+                    </form>
+
+                    <form
+                      ref={newTabFormRef}
+                      action={checkoutURL}
+                      method="POST"
+                      target="_blank"
+                      className="hidden"
+                    >
+                      {Object.keys(checkoutFormfields).map((field) => (
+                        <input
+                          key={field}
+                          type="hidden"
+                          name={field}
+                          value={checkoutFormfields[field]}
+                        />
+                      ))}
+                    </form>
+
+                    {/* Khung nhúng Cổng Thanh Toán SePay - Tự động hiển thị Mã QR VietQR Napas 24/7 */}
+                    <div className="relative w-full rounded-xl overflow-hidden border border-slate-200 bg-white shadow-xs">
+                      {!iframeLoaded && (
+                        <div className="h-[460px] flex flex-col items-center justify-center p-6 text-center space-y-3 bg-slate-50">
+                          <div className="w-8 h-8 border-3 border-[#f26f21] border-t-transparent rounded-full animate-spin"></div>
+                          <p className="text-xs font-semibold text-slate-700">Đang khởi tạo mã QR từ Cổng Thanh Toán SePay Live...</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              iframeFormRef.current?.submit();
+                              setIframeLoaded(true);
+                            }}
+                            className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded-lg font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+                          >
+                            Bấm để nạp lại mã QR
+                          </button>
+                        </div>
+                      )}
+                      
+                      <iframe
+                        name="sepay_checkout_frame"
+                        id="sepay_checkout_frame"
+                        title="Cổng Thanh Toán SePay"
+                        className={`w-full h-[520px] border-0 transition-opacity duration-300 ${iframeLoaded ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
+                        onLoad={() => setIframeLoaded(true)}
+                      />
+                    </div>
+
+                    {/* Hàng nút bấm hành động */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          iframeFormRef.current?.submit();
+                          setIframeLoaded(true);
+                        }}
+                        className="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">refresh</span>
+                        <span>Tải lại mã QR</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => newTabFormRef.current?.submit()}
+                        className="flex-1 fpt-gradient fpt-gradient-hover text-white font-bold text-xs py-2.5 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                        <span>Mở Cổng SePay Toàn Màn Hình</span>
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
                     Chưa cấu hình SePay Merchant ID & Secret Key trong file .env hoặc Cài đặt.
