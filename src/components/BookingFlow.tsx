@@ -34,7 +34,7 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [studentId, setStudentId] = useState('');
-  const [issueNote, setIssueNote] = useState('Loa nghe nhỏ một bên, dock sạc bám cặn đen');
+  const [issueNote, setIssueNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'CASH'>('VIETQR');
   const [formErrors, setFormErrors] = useState<{ name?: string; phone?: string }>({});
 

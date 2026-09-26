@@ -76,7 +76,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
   const [fullName, setFullName] = useState(currentUser?.fullName || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [studentId, setStudentId] = useState(currentUser?.studentId || '');
-  const [issueNote, setIssueNote] = useState('Loa nghẹt 1 bên, bụi bám màng loa');
+  const [issueNote, setIssueNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'CASH'>('VIETQR');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -352,10 +352,18 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
 
       {/* 6. STUDENT INFO & ISSUE */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
-        <label className="font-heading font-bold text-sm text-[#0b1c30] flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#f26f21] text-[18px]">person</span>
-          <span>6. Thông Tin Sinh Viên & Triệu Chứng:</span>
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="font-heading font-bold text-sm text-[#0b1c30] flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#f26f21] text-[18px]">person</span>
+            <span>6. Thông Tin Sinh Viên & Triệu Chứng:</span>
+          </label>
+          {currentUser && (
+            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded font-semibold border border-emerald-200 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px]">verified_user</span>
+              <span>Tự động điền từ tài khoản</span>
+            </span>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -402,11 +410,15 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
         </div>
 
         <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-semibold text-slate-700">Mô tả tình trạng máy (bạn tự điền):</span>
+            <span className="text-[10px] text-slate-400">Không bắt buộc</span>
+          </div>
           <textarea
             rows={2}
             value={issueNote}
             onChange={(e) => setIssueNote(e.target.value)}
-            placeholder="Mô tả lỗi âm thanh hoặc bám bẩn (để kỹ thuật viên kiểm tra lâm sàng)..."
+            placeholder="Nhập mô tả lỗi âm thanh hoặc tình trạng bám bẩn (VD: loa rè, âm lượng nhỏ 1 bên, dock sạc bám bụi...)"
             className="w-full p-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#f26f21] focus:outline-none"
           />
         </div>
