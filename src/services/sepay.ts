@@ -42,14 +42,17 @@ export interface SePayCheckoutFormFields {
   signature: string;
 }
 
+const PROD_MERCHANT_ID = 'SP-LIVE-CT923674';
+const PROD_SECRET_KEY = 'spsk_live_33853dHEwkFkqmbjH3SywB4brA7pKisA';
+
 export const DEFAULT_SEPAY_PG_CONFIG: SePayPgConfig = {
   env: 'production',
-  merchant_id: '',
-  secret_key: ''
+  merchant_id: PROD_MERCHANT_ID,
+  secret_key: PROD_SECRET_KEY
 };
 
 /**
- * Lấy cấu hình SePay PG (Production) từ Environment Variables hoặc LocalStorage
+ * Lấy cấu hình SePay PG (Production) từ Environment Variables, LocalStorage hoặc Default Credentials
  */
 export const getSePayPgConfig = (): SePayPgConfig => {
   try {
@@ -58,8 +61,8 @@ export const getSePayPgConfig = (): SePayPgConfig => {
       const parsed = JSON.parse(saved);
       return {
         env: (parsed.env as SePayPgEnv) || (import.meta.env.VITE_SEPAY_ENV as SePayPgEnv) || 'production',
-        merchant_id: parsed.merchant_id || import.meta.env.VITE_SEPAY_MERCHANT_ID || '',
-        secret_key: parsed.secret_key || import.meta.env.VITE_SEPAY_SECRET_KEY || ''
+        merchant_id: (parsed.merchant_id || import.meta.env.VITE_SEPAY_MERCHANT_ID || PROD_MERCHANT_ID).trim(),
+        secret_key: (parsed.secret_key || import.meta.env.VITE_SEPAY_SECRET_KEY || PROD_SECRET_KEY).trim()
       };
     }
   } catch {
@@ -68,8 +71,8 @@ export const getSePayPgConfig = (): SePayPgConfig => {
 
   return {
     env: (import.meta.env.VITE_SEPAY_ENV as SePayPgEnv) || 'production',
-    merchant_id: import.meta.env.VITE_SEPAY_MERCHANT_ID || '',
-    secret_key: import.meta.env.VITE_SEPAY_SECRET_KEY || ''
+    merchant_id: (import.meta.env.VITE_SEPAY_MERCHANT_ID || PROD_MERCHANT_ID).trim(),
+    secret_key: (import.meta.env.VITE_SEPAY_SECRET_KEY || PROD_SECRET_KEY).trim()
   };
 };
 

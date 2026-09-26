@@ -293,24 +293,19 @@ export function App() {
 
       if (saved.paymentMethod === 'VIETQR') {
         // Đẩy thẳng sang Cổng Thanh Toán SePay chính thức toàn màn hình (Full-page Redirect)
-        try {
-          redirectToSePayCheckout({
-            bookingCode: saved.bookingCode,
-            amount: saved.amount,
-            description: `PODCYCLE ${saved.bookingCode}`,
-            customerId: saved.studentId || saved.phone
-          });
-          return;
-        } catch (err: any) {
-          console.warn('[SePay Redirect]', err.message);
-          // Nếu có lỗi cấu hình, fallback vào trang chi tiết
-          navigate(`/detail/${saved.bookingCode}`);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-      } else {
-        navigate(`/detail/${saved.bookingCode}`);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Tuyệt đối KHÔNG navigate vào /detail ở đây!
+        redirectToSePayCheckout({
+          bookingCode: saved.bookingCode,
+          amount: saved.amount,
+          description: `PODCYCLE ${saved.bookingCode}`,
+          customerId: saved.studentId || saved.phone
+        });
+        return;
       }
+
+      // Chỉ chuyển hướng vào /detail khi khách chọn Thanh toán Tiền mặt tại trạm
+      navigate(`/detail/${saved.bookingCode}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       alert(`[Lỗi Cơ Sở Dữ Liệu] Không thể tạo đơn: ${err.message}`);
     }

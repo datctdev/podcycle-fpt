@@ -461,7 +461,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
           {isSubmitting ? (
             <>
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span>{paymentMethod === 'VIETQR' ? 'Đang chuyển đến Cổng SePay...' : 'Đang xử lý đặt lịch...'}</span>
+              <span>Đang chuyển sang Cổng SePay...</span>
             </>
           ) : (
             <>
@@ -469,13 +469,28 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
                 {paymentMethod === 'VIETQR' ? 'payments' : 'check_circle'}
               </span>
               <span>
-                {paymentMethod === 'VIETQR' ? 'Xác Nhận & Thanh Toán Qua SePay' : 'Xác Nhận Giữ Slot (Tiền Mặt)'}
+                {paymentMethod === 'VIETQR' ? 'Xác Nhận Giữ Slot (Cổng SePay)' : 'Xác Nhận Giữ Slot (Tiền Mặt)'}
               </span>
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </>
           )}
         </button>
       </div>
+
+      {/* Full-screen Loading Overlay khi chuyển hướng sang SePay */}
+      {isSubmitting && (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex flex-col items-center justify-center text-white space-y-4">
+          <div className="w-12 h-12 border-4 border-[#f26f21] border-t-transparent rounded-full animate-spin"></div>
+          <div className="text-center space-y-1">
+            <h3 className="font-heading font-extrabold text-base text-white">
+              Đang Chuyển Sang Cổng Thanh Toán SePay...
+            </h3>
+            <p className="text-xs text-slate-300">
+              Đang kết nối cổng thanh toán an toàn. Bạn sẽ được đưa về lại vé hẹn ngay khi hoàn tất.
+            </p>
+          </div>
+        </div>
+      )}
 
     </div>
   );
