@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { CAMPUSES, SERVICES, INITIAL_SLOTS } from '../data/mockData';
-import { ServiceItem, DeviceModel, Booking, TimeSlot } from '../types';
+import { ServiceItem, DeviceModel, Booking, TimeSlot, User } from '../types';
 import { trackEvent } from '../utils/analytics';
 
 interface StitchBookingProps {
   initialService?: ServiceItem | null;
+  currentUser?: User | null;
   onBookingSuccess: (booking: Booking) => void;
   onBack: () => void;
 }
 
 export const StitchBooking: React.FC<StitchBookingProps> = ({
   initialService,
+  currentUser,
   onBookingSuccess,
   onBack
 }) => {
@@ -32,10 +34,10 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(dateOptions[0].date);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot>(INITIAL_SLOTS[0]);
 
-  // Form
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [studentId, setStudentId] = useState('');
+  // Form: Autofill from currentUser if available
+  const [fullName, setFullName] = useState(currentUser?.fullName || '');
+  const [phone, setPhone] = useState(currentUser?.phone || '');
+  const [studentId, setStudentId] = useState(currentUser?.studentId || '');
   const [issueNote, setIssueNote] = useState('Loa nghẹt 1 bên, bụi bám màng loa');
   const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'CASH'>('VIETQR');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});

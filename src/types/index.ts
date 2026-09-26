@@ -6,6 +6,19 @@ export type DeviceModel =
   | 'AirPods Pro 2'
   | 'AirPods Max';
 
+export type UserRole = 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
+
+export interface User {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  studentId?: string;
+  role: UserRole;
+  campus?: string;
+  avatar?: string;
+}
+
 export interface ServiceItem {
   id: string;
   name: string;
@@ -24,16 +37,17 @@ export interface TimeSlot {
 }
 
 export type BookingStatus = 
-  | 'PENDING'       // Đã đặt, chờ nhận máy
-  | 'CHECKED_IN'     // Staff đã nhận máy tại sảnh
-  | 'CLEANING'       // Đang vệ sinh ngoại quan chuyên sâu
-  | 'READY'          // Hoàn thành, chờ sinh viên đến lấy
-  | 'COMPLETED'      // Đã test âm thanh và bàn giao thành công
+  | 'PENDING'       // Chờ tiếp nhận tại sảnh
+  | 'CHECKED_IN'     // Đã nhận máy, dán niêm phong
+  | 'CLEANING'       // Đang bảo dưỡng & vệ sinh 30 phút
+  | 'READY'          // Hoàn tất, chờ khách test âm & lấy máy
+  | 'COMPLETED'      // Đã test đạt chuẩn, thanh toán & bàn giao
   | 'CANCELLED';
 
 export interface Booking {
   id: string;
   bookingCode: string;
+  userId?: string;
   customerName: string;
   phone: string;
   studentId: string;
@@ -48,6 +62,10 @@ export interface Booking {
   paymentMethod: 'VIETQR' | 'CASH';
   paymentStatus: 'UNPAID' | 'PAID';
   status: BookingStatus;
+  technicianName?: string;
+  cleaningStartedAt?: string;
+  completedAt?: string;
+  soundClarityScore?: number; // e.g., 98%
   createdAt: string;
 }
 
