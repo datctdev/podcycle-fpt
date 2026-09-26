@@ -496,6 +496,30 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
                 )}
               </button>
 
+              {/* Hỗ trợ kích hoạt vé khi sinh viên đã chuyển khoản trên app ngân hàng (môi trường localhost chưa kết nối IPN) */}
+              <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                <button
+                  onClick={() => {
+                    const confirm = window.confirm(
+                      `XÁC NHẬN BẠN ĐÃ CHUYỂN KHOẢN THÀNH CÔNG?\n\n` +
+                      `Mã đơn: ${booking.bookingCode}\n` +
+                      `Số tiền: ${booking.amount.toLocaleString('vi-VN')}đ\n\n` +
+                      `Hệ thống sẽ kích hoạt Vé Hẹn Điện Tử. Khi mang AirPods tới Sảnh Tòa Nhà A, Kỹ thuật viên sẽ đối soát với sao kê trước khi nhận máy!`
+                    );
+                    if (confirm) {
+                      handleConfirmPaymentSuccess('CUSTOMER_APP_TRANSFER_CONFIRMED');
+                    }
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[16px]">task_alt</span>
+                  <span>Tôi Đã Chuyển Khoản Xong ➔ Mở Khóa Vé Hẹn QR</span>
+                </button>
+                <p className="text-[10px] text-slate-400 text-center">
+                  (Dành cho môi trường chưa cấu hình Webhook IPN hoặc đang chờ ngân hàng đồng bộ)
+                </p>
+              </div>
+
             </div>
           ) : (
             /* PAID SUCCESS BANNER */
@@ -556,35 +580,52 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
           </div>
         </div>
 
-        {/* Mã QR Định Danh Vé Hẹn Cho KTV Quét Camera Check-in */}
-        <div className="flex flex-col sm:flex-row items-center gap-5 bg-gradient-to-br from-slate-50 to-orange-50/40 p-4 rounded-2xl border border-slate-200/80">
-          <div className="bg-white p-2.5 rounded-2xl border-2 border-dashed border-[#f26f21]/40 shadow-sm shrink-0 flex flex-col items-center">
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(booking.bookingCode)}`}
-              alt={`QR Code Pass ${booking.bookingCode}`}
-              className="w-36 h-36 object-contain rounded-lg"
-              loading="lazy"
-            />
-            <span className="font-mono font-black text-sm text-[#0b1c30] mt-1.5 tracking-wider">
-              {booking.bookingCode}
-            </span>
-          </div>
+        {/* Mã QR Định Danh Vé Hẹn - CHỈ KÍCH HOẠT KHI ĐÃ THANH TOÁN THÀNH CÔNG */}
+        {isPaid ? (
+          <div className="flex flex-col sm:flex-row items-center gap-5 bg-gradient-to-br from-emerald-50/60 to-orange-50/40 p-4 rounded-2xl border border-emerald-200/80">
+            <div className="bg-white p-2.5 rounded-2xl border-2 border-dashed border-emerald-500 shadow-sm shrink-0 flex flex-col items-center">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(booking.bookingCode)}`}
+                alt={`QR Code Pass ${booking.bookingCode}`}
+                className="w-36 h-36 object-contain rounded-lg"
+                loading="lazy"
+              />
+              <span className="font-mono font-black text-sm text-emerald-800 mt-1.5 tracking-wider">
+                {booking.bookingCode}
+              </span>
+            </div>
 
-          <div className="space-y-2 text-xs flex-1 text-center sm:text-left">
-            <p className="font-bold text-slate-800 text-sm flex items-center justify-center sm:justify-start gap-1 text-[#f26f21]">
-              <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
-              <span>Đưa mã QR này cho KTV tại bàn trực</span>
-            </p>
-            <p className="text-slate-600 leading-relaxed text-[11px]">
-              Kỹ thuật viên sẽ dùng camera quét mã trên vé này để <strong>Check-in</strong> và cùng bạn thực hiện <strong>Đồng kiểm lâm sàng màng loa</strong> trước khi nhận máy.
-            </p>
-            <div className="pt-1.5 border-t border-slate-200/60 text-[11px] text-slate-500 space-y-1">
-              <p>📍 <strong>Địa điểm:</strong> Bàn trực sảnh tự học Tòa nhà A (Cạnh Canteen)</p>
-              <p>⏰ <strong>Khung giờ:</strong> {booking.bookingDate} ({booking.slotTime})</p>
-              <p>🎧 <strong>Thiết bị:</strong> {booking.deviceModel} • {booking.customerName}</p>
+            <div className="space-y-2 text-xs flex-1 text-center sm:text-left">
+              <p className="font-bold text-emerald-800 text-sm flex items-center justify-center sm:justify-start gap-1">
+                <span className="material-symbols-outlined text-[18px] text-emerald-600">verified</span>
+                <span>Vé Hẹn Đã Kích Hoạt • Đưa Mã Này Cho KTV</span>
+              </p>
+              <p className="text-slate-600 leading-relaxed text-[11px]">
+                Kỹ thuật viên tại bàn trực Sảnh Tòa Nhà A sẽ dùng camera quét mã QR này để <strong>Check-in</strong> và cùng bạn thực hiện <strong>Đồng kiểm lâm sàng màng loa</strong> trước khi nhận máy.
+              </p>
+              <div className="pt-1.5 border-t border-slate-200/60 text-[11px] text-slate-500 space-y-1">
+                <p>📍 <strong>Địa điểm:</strong> Bàn trực sảnh tự học Tòa nhà A (Cạnh Canteen)</p>
+                <p>⏰ <strong>Khung giờ:</strong> {booking.bookingDate} ({booking.slotTime})</p>
+                <p>🎧 <strong>Thiết bị:</strong> {booking.deviceModel} • {booking.customerName}</p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-6 rounded-2xl bg-amber-50/70 border border-amber-200 text-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 mx-auto flex items-center justify-center border border-amber-300 shadow-xs">
+              <span className="material-symbols-outlined text-[28px]">lock</span>
+            </div>
+            <div>
+              <h4 className="font-heading font-bold text-sm text-amber-900">Mã QR Check-in Đang Tạm Khóa</h4>
+              <p className="text-xs text-amber-700/90 mt-1 max-w-md mx-auto">
+                Theo quy chuẩn SOP trạm O2O Station, Vé Hẹn Điện Tử & Mã QR Check-in chỉ được phát hành sau khi đơn hàng được ghi nhận thanh toán qua Cổng SePay.
+              </p>
+            </div>
+            <p className="text-[11px] text-slate-600 font-medium">
+              👉 Vui lòng quét mã VietQR phía trên để thanh toán và kích hoạt Vé Hẹn Điện Tử.
+            </p>
+          </div>
+        )}
 
         {/* 6-Stage SOP Progress Tracker */}
         <div className="space-y-2 pt-2">

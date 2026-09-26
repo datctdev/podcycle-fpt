@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { CAMPUSES } from '../services/dataInit';
 import { playStationNotification } from '../utils/sound';
+import { DatabaseService } from '../services/db';
 
 interface TechnicianWorkspaceProps {
   currentUser: User;
@@ -99,6 +100,38 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
     .filter((b) => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
     .reduce((sum, b) => sum + b.amount, 0);
 
+  // Kiểm tra đơn đã thanh toán hợp lệ chưa (Bắt buộc theo SOP O2O)
+  const isBookingPaid = (b: Booking): boolean => {
+    return b.paymentStatus === 'PAID' || (b.status !== 'PENDING_PAYMENT' && b.status !== 'PENDING');
+  };
+
+  // KTV chủ động đối soát và xác nhận thanh toán tại bàn trực khi khách hàng chứng minh đã chuyển khoản SePay
+  const handleConfirmPaymentAtCounter = (booking: Booking) => {
+    const confirm = window.confirm(
+      `XÁC NHẬN ĐỐI SOÁT THANH TOÁN TẠI QUẦY?\n\n` +
+      `Mã đơn: ${booking.bookingCode}\n` +
+      `Khách hàng: ${booking.customerName} (${booking.phone})\n` +
+      `Số tiền: ${booking.amount.toLocaleString('vi-VN')}đ\n\n` +
+      `Bạn chắc chắn đã kiểm tra sao kê SePay (hoặc màn hình chuyển khoản của sinh viên) đã nhận đủ ${booking.amount.toLocaleString('vi-VN')}đ?`
+    );
+    if (!confirm) return;
+
+    // Ghi nhận giao dịch vào bảng transactions
+    DatabaseService.recordTransaction({
+      bookingId: booking.id,
+      bookingCode: booking.bookingCode,
+      amount: booking.amount,
+      paymentMethod: 'SEPAY_PG',
+      referenceNumber: 'KTV_COUNTER_VERIFIED'
+    });
+
+    onUpdateStatus(booking.id, 'CONFIRMED', {
+      paymentStatus: 'PAID'
+    });
+
+    playStationNotification('complete');
+  };
+
   // 1. Quét mã QR check-in
   const handleQuickCheckinScan = (codeToFind?: string) => {
     const code = (codeToFind || scanCodeInput).trim().toUpperCase();
@@ -110,6 +143,20 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
     );
 
     if (found) {
+      // VALIDATE NGHIÊM NGẶT: Chặn KTV nhận máy nếu đơn chưa thanh toán
+      if (!isBookingPaid(found)) {
+        playStationNotification('alert');
+        alert(
+          `⛔ [TỪ CHỐI CHECK-IN] ĐƠN HÀNG CHƯA THANH TOÁN!\n\n` +
+          `Mã đơn: ${found.bookingCode}\n` +
+          `Khách hàng: ${found.customerName} (${found.phone})\n` +
+          `Số tiền cần thanh toán: ${found.amount.toLocaleString('vi-VN')}đ\n\n` +
+          `Theo quy định SOP trạm O2O Station, Kỹ thuật viên KHÔNG ĐƯỢC PHÉP tiếp nhận thiết bị khi đơn hàng chưa hoàn tất thanh toán qua Cổng SePay.\n\n` +
+          `Vui lòng yêu cầu sinh viên hoàn tất thanh toán trên điện thoại, hoặc KTV kiểm tra sao kê SePay và bấm nút "Đối Soát Đã Nhận Tiền" tại bàn trực.`
+        );
+        return;
+      }
+
       playStationNotification('complete');
       setIsScanModalOpen(false);
       setScanCodeInput('');
@@ -121,6 +168,12 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
 
   // Mở modal đồng kiểm Before
   const openChecklistBeforeModal = (booking: Booking) => {
+    if (!isBookingPaid(booking)) {
+      playStationNotification('alert');
+      alert(`⛔ [TỪ CHỐI] Đơn hàng ${booking.bookingCode} chưa thanh toán! Không thể mở biên bản khám lâm sàng.`);
+      return;
+    }
+
     setActiveChecklistBeforeBooking(booking);
     setSerialInput(booking.serialNumber || '');
     setScratchesLevel(booking.checklistBefore?.caseScratches || 'LIGHT');
@@ -449,13 +502,42 @@ export const TechnicianWorkspace: React.FC<TechnicianWorkspaceProps> = ({
                       </p>
                     )}
 
-                    <button
-                      onClick={() => openChecklistBeforeModal(b)}
-                      className="w-full bg-[#f26f21] hover:bg-[#e05e10] text-white text-xs font-bold py-2 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">clinical_notes</span>
-                      <span>Khám Lâm Sàng & Nhận Máy</span>
-                    </button>
+                    {isBookingPaid(b) ? (
+                      <button
+                        onClick={() => openChecklistBeforeModal(b)}
+                        className="w-full bg-[#f26f21] hover:bg-[#e05e10] text-white text-xs font-bold py-2 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">clinical_notes</span>
+                        <span>Khám Lâm Sàng & Nhận Máy</span>
+                      </button>
+                    ) : (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="p-2 rounded-lg bg-red-950/40 border border-red-800/60 text-red-300 text-[11px] flex items-start gap-1.5">
+                          <span className="material-symbols-outlined text-[14px] text-red-400 shrink-0 mt-0.5">lock</span>
+                          <span><strong>Chưa thanh toán:</strong> Không được nhận máy. Yêu cầu khách hoàn tất SePay.</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          <button
+                            disabled
+                            className="w-full bg-slate-800 text-slate-500 text-[11px] font-bold py-2 rounded-lg cursor-not-allowed flex items-center justify-center gap-1 border border-slate-700/60 opacity-60"
+                            title="Khách chưa thanh toán - Khóa tiếp nhận"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">block</span>
+                            <span>Khóa Nhận Máy</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleConfirmPaymentAtCounter(b)}
+                            className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs border border-blue-400/40"
+                            title="KTV bấm sau khi kiểm tra sao kê SePay (VD: thấy biến động +90k như trên web SePay)"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">verified</span>
+                            <span>Đối Soát Đã Nhận Tiền</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
