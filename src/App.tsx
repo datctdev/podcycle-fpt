@@ -25,6 +25,7 @@ import { Booking, ServiceItem, BookingStatus, User } from './types';
 import { trackEvent } from './utils/analytics';
 import { DatabaseService } from './services/db';
 import { playStationNotification } from './utils/sound';
+import { redirectToSePayCheckout } from './services/sepay';
 
 // Route wrapper for Appointment Detail with deep-link parameter support
 function AppointmentDetailRoute({
@@ -32,20 +33,49 @@ function AppointmentDetailRoute({
   activeBooking,
   onBack,
   onOpenReview,
-  onConfirmPayment
+  onConfirmPayment,
+  dbStatus,
+  onRefresh
 }: {
   bookings: Booking[];
   activeBooking: Booking | null;
   onBack: () => void;
   onOpenReview: () => void;
   onConfirmPayment: (id: string) => void;
+  dbStatus: 'CONNECTING' | 'CONNECTED' | 'ERROR';
+  onRefresh: () => void;
 }) {
   const { bookingCode } = useParams<{ bookingCode?: string }>();
-  const targetBooking = bookingCode
+  const [directBooking, setDirectBooking] = useState<Booking | null>(null);
+  const [isFetchingDirect, setIsFetchingDirect] = useState(false);
+
+  const matched = bookingCode
     ? bookings.find((b) => b.bookingCode.toLowerCase() === bookingCode.toLowerCase()) || activeBooking
     : activeBooking || bookings[0];
 
+  const targetBooking = matched || directBooking;
+
+  useEffect(() => {
+    if (!targetBooking && bookingCode) {
+      setIsFetchingDirect(true);
+      DatabaseService.getBookingByCode(bookingCode)
+        .then((b) => {
+          if (b) setDirectBooking(b);
+        })
+        .finally(() => setIsFetchingDirect(false));
+    }
+  }, [bookingCode, targetBooking]);
+
   if (!targetBooking) {
+    if (dbStatus === 'CONNECTING' || isFetchingDirect) {
+      return (
+        <div className="pt-28 pb-20 text-center max-w-md mx-auto px-4">
+          <div className="w-9 h-9 border-3 border-[#f26f21] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <h2 className="font-heading font-bold text-sm text-[#0b1c30]">Đang Tải Chi Tiết Lịch Hẹn...</h2>
+          <p className="text-xs text-slate-500 mt-1">Đang đồng bộ dữ liệu giao dịch từ hệ thống.</p>
+        </div>
+      );
+    }
     return (
       <div className="pt-28 pb-20 text-center max-w-md mx-auto px-4">
         <div className="w-16 h-16 rounded-2xl bg-orange-100 text-[#f26f21] flex items-center justify-center mx-auto mb-3">
@@ -55,7 +85,7 @@ function AppointmentDetailRoute({
         <p className="text-xs text-slate-500 mt-1">Mã lịch hẹn không tồn tại trên hệ thống hoặc đã hết hạn.</p>
         <button
           onClick={onBack}
-          className="mt-4 fpt-gradient fpt-gradient-hover text-white text-xs font-bold px-6 py-2.5 rounded-full shadow-xs"
+          className="mt-4 fpt-gradient fpt-gradient-hover text-white text-xs font-bold px-6 py-2.5 rounded-full shadow-xs cursor-pointer"
         >
           Quay lại Lịch Hẹn
         </button>
@@ -69,6 +99,7 @@ function AppointmentDetailRoute({
       onBack={onBack}
       onOpenReview={onOpenReview}
       onConfirmPayment={onConfirmPayment}
+      onRefresh={onRefresh}
     />
   );
 }
@@ -252,15 +283,34 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Booking creation - Ghi trực tiếp vào PostgreSQL (Không fallback!)
+  // Booking creation - Ghi trực tiếp vào PostgreSQL và Đẩy trực tiếp qua Cổng SePay
   const handleBookingCreated = async (newBooking: Booking) => {
     try {
       const saved = await DatabaseService.createBooking(newBooking);
       setBookings((prev) => [saved, ...prev]);
       setActiveBooking(saved);
       playStationNotification('new_booking');
-      navigate(`/detail/${saved.bookingCode}`);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      if (saved.paymentMethod === 'VIETQR') {
+        // Đẩy thẳng sang Cổng Thanh Toán SePay chính thức toàn màn hình (Full-page Redirect)
+        try {
+          redirectToSePayCheckout({
+            bookingCode: saved.bookingCode,
+            amount: saved.amount,
+            description: `PODCYCLE ${saved.bookingCode}`,
+            customerId: saved.studentId || saved.phone
+          });
+          return;
+        } catch (err: any) {
+          console.warn('[SePay Redirect]', err.message);
+          // Nếu có lỗi cấu hình, fallback vào trang chi tiết
+          navigate(`/detail/${saved.bookingCode}`);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      } else {
+        navigate(`/detail/${saved.bookingCode}`);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } catch (err: any) {
       alert(`[Lỗi Cơ Sở Dữ Liệu] Không thể tạo đơn: ${err.message}`);
     }
@@ -444,6 +494,8 @@ export function App() {
                   onBack={() => navigate('/appointments')}
                   onOpenReview={() => setIsReviewOpen(true)}
                   onConfirmPayment={handleConfirmPayment}
+                  dbStatus={dbStatus}
+                  onRefresh={refreshBookingsFromDatabase}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -460,6 +512,8 @@ export function App() {
                   onBack={() => navigate('/appointments')}
                   onOpenReview={() => setIsReviewOpen(true)}
                   onConfirmPayment={handleConfirmPayment}
+                  dbStatus={dbStatus}
+                  onRefresh={refreshBookingsFromDatabase}
                 />
               ) : (
                 <Navigate to="/login" replace />

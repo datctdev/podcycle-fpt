@@ -55,6 +55,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
   const [issueNote, setIssueNote] = useState('Loa nghẹt 1 bên, bụi bám màng loa');
   const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'CASH'>('VIETQR');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   React.useEffect(() => {
     if (currentUser) {
@@ -149,6 +150,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
       ]
     });
 
+    setIsSubmitting(true);
     onBookingSuccess(newBooking);
   };
 
@@ -430,12 +432,12 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
         {paymentMethod === 'VIETQR' && (
           <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex items-center gap-3.5 text-xs text-slate-700">
             <div className="w-10 h-10 rounded-xl bg-orange-100 text-[#f26f21] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[22px]">qr_code_scanner</span>
+              <span className="material-symbols-outlined text-[22px]">payments</span>
             </div>
             <div className="space-y-0.5">
-              <p className="font-bold text-[#0b1c30]">Cổng Thanh Toán Tự Động SePay (VietQR Napas 24/7)</p>
+              <p className="font-bold text-[#0b1c30]">Cổng Thanh Toán SePay (Chuyển Tiếp Toàn Màn Hình)</p>
               <p className="text-[11px] text-slate-500">
-                Sau khi bấm <strong>"Xác Nhận Đặt Lịch"</strong>, hệ thống sẽ tạo mã QR thanh toán riêng cho đơn hàng này kèm cú pháp chuyển khoản chính xác để bạn quét mã.
+                Sau khi bấm <strong>"Xác Nhận & Thanh Toán Qua SePay"</strong>, hệ thống sẽ chuyển hướng bạn trực tiếp sang Cổng SePay chính thức để quét mã VietQR hoặc mở App ngân hàng chuyển khoản 24/7. Thanh toán xong hệ thống sẽ tự động đưa bạn về vé hẹn.
               </p>
             </div>
           </div>
@@ -453,10 +455,25 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
 
         <button
           onClick={handleValidateAndSubmit}
-          className="fpt-gradient fpt-gradient-hover text-white font-bold text-xs sm:text-sm px-7 py-3 rounded-full shadow-md active:scale-95 transition-all flex items-center gap-2"
+          disabled={isSubmitting}
+          className="fpt-gradient fpt-gradient-hover text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-full shadow-md active:scale-95 transition-all flex items-center gap-2 disabled:opacity-75 cursor-pointer"
         >
-          <span>Xác Nhận Giữ Slot</span>
-          <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          {isSubmitting ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span>{paymentMethod === 'VIETQR' ? 'Đang chuyển đến Cổng SePay...' : 'Đang xử lý đặt lịch...'}</span>
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-[18px]">
+                {paymentMethod === 'VIETQR' ? 'payments' : 'check_circle'}
+              </span>
+              <span>
+                {paymentMethod === 'VIETQR' ? 'Xác Nhận & Thanh Toán Qua SePay' : 'Xác Nhận Giữ Slot (Tiền Mặt)'}
+              </span>
+              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            </>
+          )}
         </button>
       </div>
 

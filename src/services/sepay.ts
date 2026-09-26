@@ -170,6 +170,61 @@ export class SePayPgClient {
 }
 
 /**
+ * Chuyển hướng toàn màn hình (Full-page Redirect) sang Cổng Thanh Toán SePay PG chính thức
+ * Không dùng iframe, hỗ trợ 100% deep-link app ngân hàng và redirect tự động về vé hẹn sau khi thanh toán
+ */
+export const redirectToSePayCheckout = (params: {
+  bookingCode: string;
+  amount: number;
+  description?: string;
+  customerId?: string;
+}) => {
+  const pgConfig = getSePayPgConfig();
+  if (!pgConfig.merchant_id || !pgConfig.secret_key) {
+    throw new Error('Chưa cấu hình SePay Merchant ID hoặc Secret Key.');
+  }
+
+  const pgClient = new SePayPgClient(pgConfig);
+  const checkoutUrl = pgClient.checkout.initCheckoutUrl();
+  const origin = window.location.origin;
+
+  const successUrl = `${origin}/detail/${params.bookingCode}?payment=success`;
+  const cancelUrl = `${origin}/detail/${params.bookingCode}?payment=cancel`;
+  const errorUrl = `${origin}/detail/${params.bookingCode}?payment=error`;
+
+  const fields = pgClient.checkout.initOneTimePaymentFields({
+    payment_method: 'BANK_TRANSFER',
+    order_invoice_number: params.bookingCode,
+    order_amount: params.amount,
+    currency: 'VND',
+    order_description: params.description || `Thanh toan don hang ${params.bookingCode}`,
+    customer_id: params.customerId,
+    success_url: successUrl,
+    error_url: errorUrl,
+    cancel_url: cancelUrl,
+  });
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = checkoutUrl;
+  form.style.display = 'none';
+
+  Object.entries(fields).forEach(([key, val]) => {
+    if (val !== undefined && val !== null) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = String(val);
+      form.appendChild(input);
+    }
+  });
+
+  document.body.appendChild(form);
+  form.submit();
+};
+
+
+/**
  * Kiểm tra trạng thái thanh toán đơn hàng trực tiếp qua SePay Payment Gateway Order API
  * Sử dụng Merchant ID & Secret Key (Basic Auth) - Chuẩn SePay PG
  */

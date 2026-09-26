@@ -149,6 +149,65 @@ export const DatabaseService = {
   },
 
   /**
+   * LẤY CHI TIẾT ĐƠN HÀNG THEO MÃ BOOKING CODE TRỰC TIẾP TỪ DATABASE
+   */
+  async getBookingByCode(bookingCode: string): Promise<Booking | null> {
+    try {
+      const sb = initSupabase();
+      const { data, error } = await sb
+        .from('bookings')
+        .select('*')
+        .ilike('booking_code', bookingCode)
+        .maybeSingle();
+
+      if (error || !data) return null;
+
+      const sopCache: Record<string, any> = {};
+      try {
+        const saved = localStorage.getItem('ttn_sop_cache');
+        if (saved) Object.assign(sopCache, JSON.parse(saved));
+      } catch {}
+      const cached = sopCache[data.id] || {};
+
+      return {
+        id: data.id,
+        bookingCode: data.booking_code,
+        userId: data.user_id,
+        customerName: data.customer_name,
+        phone: data.phone,
+        studentId: data.student_id,
+        campus: data.campus,
+        deviceModel: data.device_model,
+        serialNumber: data.serial_number || cached.serialNumber,
+        issueNote: data.issue_note,
+        serviceId: data.service_id,
+        serviceName: data.service_name,
+        amount: Number(data.amount),
+        bookingDate: data.booking_date,
+        slotTime: data.slot_time,
+        paymentMethod: data.payment_method,
+        paymentStatus: data.payment_status,
+        status: data.status,
+        technicianName: data.technician_name,
+        soundClarityScore: data.sound_clarity_score || cached.soundClarityScore,
+        beforePhoto: data.before_photo || cached.beforePhoto,
+        afterPhoto: data.after_photo || cached.afterPhoto,
+        checklistBefore: data.checklist_before || cached.checklistBefore,
+        checklistAfter: data.checklist_after || cached.checklistAfter,
+        scopeLockReason: data.scope_lock_reason || cached.scopeLockReason,
+        nextMaintenanceDate: data.next_maintenance_date || cached.nextMaintenanceDate,
+        refundReason: data.refund_reason || cached.refundReason,
+        refundedAt: data.refunded_at || cached.refundedAt,
+        createdAt: data.created_at,
+        completedAt: data.completed_at || cached.completedAt
+      };
+    } catch (err) {
+      console.warn('[Database] getBookingByCode failed:', err);
+      return null;
+    }
+  },
+
+  /**
    * 2. TẠO ĐƠN ĐẶT LỊCH MỚI TRỰC TIẾP VÀO POSTGRESQL (GIAI ĐOẠN 1)
    */
   async createBooking(booking: Booking): Promise<Booking> {
