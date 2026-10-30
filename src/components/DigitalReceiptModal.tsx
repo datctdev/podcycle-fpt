@@ -178,7 +178,7 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
             <span className="font-semibold text-slate-800">{booking.technicianName || 'Nguyễn Văn Minh (Trưởng ca)'}</span>
           </div>
           <div className="flex justify-between text-sm font-extrabold text-[#0b1c30] pt-1.5 border-t border-slate-100">
-            <span>Tổng thanh toán ({booking.paymentMethod === 'VIETQR' ? 'SePay Gateway' : 'Tiền mặt'}):</span>
+            <span>Tổng thanh toán (Cổng SePay Gateway):</span>
             <span className="text-[#f26f21]">{booking.amount.toLocaleString('vi-VN')}đ</span>
           </div>
         </div>

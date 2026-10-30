@@ -350,21 +350,14 @@ export function App() {
       setActiveBooking(saved);
       playStationNotification('new_booking');
 
-      if (saved.paymentMethod === 'VIETQR') {
-        // Đẩy thẳng sang Cổng Thanh Toán SePay chính thức toàn màn hình (Full-page Redirect)
-        // Tuyệt đối KHÔNG navigate vào /detail ở đây!
-        redirectToSePayCheckout({
-          bookingCode: saved.bookingCode,
-          amount: saved.amount,
-          description: `PODCYCLE ${saved.bookingCode}`,
-          customerId: saved.studentId || saved.phone
-        });
-        return;
-      }
-
-      // Chỉ chuyển hướng vào /detail khi khách chọn Thanh toán Tiền mặt tại trạm
-      navigate(`/detail/${saved.bookingCode}`);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // 100% Đẩy thẳng sang Cổng Thanh Toán SePay chính thức toàn màn hình (Full-page Redirect)
+      // Loại bỏ hoàn toàn thanh toán tiền mặt tại quầy để đảm bảo giữ slot phải trả phí
+      redirectToSePayCheckout({
+        bookingCode: saved.bookingCode,
+        amount: saved.amount,
+        description: `PODCYCLE ${saved.bookingCode}`,
+        customerId: saved.studentId || saved.phone
+      });
     } catch (err: any) {
       alert(`[Lỗi Cơ Sở Dữ Liệu] Không thể tạo đơn: ${err.message}`);
     }

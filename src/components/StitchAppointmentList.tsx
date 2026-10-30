@@ -127,7 +127,7 @@ export const StitchAppointmentList: React.FC<StitchAppointmentListProps> = ({
 
               <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
                 <span className="font-bold text-[#f26f21]">
-                  {b.amount.toLocaleString('vi-VN')}đ ({b.paymentMethod === 'VIETQR' ? 'SePay' : 'Tiền mặt'})
+                  {b.amount.toLocaleString('vi-VN')}đ (Cổng SePay)
                 </span>
 
                 {isStaffMode && onUpdateStatus ? (

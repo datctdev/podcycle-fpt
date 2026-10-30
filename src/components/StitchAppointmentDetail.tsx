@@ -272,13 +272,13 @@ export const StitchAppointmentDetail: React.FC<StitchAppointmentDetailProps> = (
           <div className="flex justify-between">
             <span className="text-slate-400">Hình thức:</span>
             <span className="font-semibold text-slate-900">
-              {booking.paymentMethod === 'VIETQR' ? 'Cổng thanh toán SePay (Bên Thứ 3)' : 'Tiền mặt tại trạm'}
+              Cổng thanh toán SePay (VietQR Napas 24/7)
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Trạng thái thanh toán:</span>
             <span className={`font-bold ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
-              {isPaid ? 'Đã Thanh Toán Thành Công' : 'Chờ Thanh Toán Qua Cổng SePay / Tiền Mặt'}
+              {isPaid ? 'Đã Thanh Toán Thành Công' : 'Chờ Thanh Toán Qua Cổng SePay'}
             </span>
           </div>
         </div>

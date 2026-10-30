@@ -77,7 +77,7 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [studentId, setStudentId] = useState(currentUser?.studentId || '');
   const [issueNote, setIssueNote] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'CASH'>('VIETQR');
+  const paymentMethod = 'VIETQR';
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -426,58 +426,31 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
 
       {/* 7. REAL VIETQR PAYMENT METHOD */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
-        <label className="font-heading font-bold text-sm text-[#0b1c30] flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#f26f21] text-[18px]">payments</span>
-          <span>7. Phương Thức Thanh Toán (VietQR Chuẩn Napas):</span>
-        </label>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div
-            onClick={() => setPaymentMethod('VIETQR')}
-            className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-              paymentMethod === 'VIETQR'
-                ? 'border-[#f26f21] bg-orange-50/50 ring-2 ring-[#f26f21]/20'
-                : 'border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center gap-2 font-bold text-xs text-[#0b1c30]">
-              <span className="material-symbols-outlined text-[#f26f21] text-[18px]">qr_code_2</span>
-              <span>Chuyển khoản SePay (Napas 24/7)</span>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Quét từ app ngân hàng thật (VCB, MB, Techcombank, MoMo...), tự động điền STK & số tiền
-            </p>
-          </div>
-
-          <div
-            onClick={() => setPaymentMethod('CASH')}
-            className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-              paymentMethod === 'CASH'
-                ? 'border-[#f26f21] bg-orange-50/50 ring-2 ring-[#f26f21]/20'
-                : 'border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center gap-2 font-bold text-xs text-[#0b1c30]">
-              <span className="material-symbols-outlined text-emerald-600 text-[18px]">local_atm</span>
-              <span>Tiền mặt tại sảnh tự học</span>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">Thanh toán trực tiếp sau khi nghe thử âm thanh</p>
-          </div>
+        <div className="flex items-center justify-between">
+          <label className="font-heading font-bold text-sm text-[#0b1c30] flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#f26f21] text-[18px]">payments</span>
+            <span>7. Phương Thức Thanh Toán (VietQR Chuẩn Napas):</span>
+          </label>
+          <span className="text-[10px] bg-orange-100 text-[#f26f21] font-bold px-2.5 py-0.5 rounded-full border border-orange-200">
+            CỔNG SEPAY GATEWAY LIVE
+          </span>
         </div>
 
-        {paymentMethod === 'VIETQR' && (
-          <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 flex items-center gap-3.5 text-xs text-slate-700">
-            <div className="w-10 h-10 rounded-xl bg-orange-100 text-[#f26f21] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[22px]">payments</span>
+        <div className="p-4 rounded-xl border border-[#f26f21] bg-orange-50/50 ring-2 ring-[#f26f21]/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 font-bold text-xs text-[#0b1c30]">
+              <span className="material-symbols-outlined text-[#f26f21] text-[20px]">qr_code_2</span>
+              <span>Chuyển khoản SePay (Napas 24/7 - VietQR)</span>
             </div>
-            <div className="space-y-0.5">
-              <p className="font-bold text-[#0b1c30]">Cổng Thanh Toán SePay (Chuyển Tiếp Toàn Màn Hình)</p>
-              <p className="text-[11px] text-slate-500">
-                Sau khi bấm <strong>"Xác Nhận & Thanh Toán Qua SePay"</strong>, hệ thống sẽ chuyển hướng bạn trực tiếp sang Cổng SePay chính thức để quét mã VietQR hoặc mở App ngân hàng chuyển khoản 24/7. Thanh toán xong hệ thống sẽ tự động đưa bạn về vé hẹn.
-              </p>
-            </div>
+            <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Tự động kích hoạt
+            </span>
           </div>
-        )}
+          <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+            Hệ thống chuyển hướng toàn màn hình trực tiếp sang Cổng SePay chính thức có ký số HMAC-SHA256 để bạn quét mã VietQR bằng mọi ứng dụng ngân hàng (VCB, MB, Techcombank, MoMo,...). Sau khi chuyển khoản thành công, hệ thống sẽ tự động xác nhận và phát hành vé hẹn QR Check-in.
+          </p>
+        </div>
       </div>
 
       {/* CONFIRMATION FOOTER BAR */}
@@ -501,12 +474,8 @@ export const StitchBooking: React.FC<StitchBookingProps> = ({
             </>
           ) : (
             <>
-              <span className="material-symbols-outlined text-[18px]">
-                {paymentMethod === 'VIETQR' ? 'payments' : 'check_circle'}
-              </span>
-              <span>
-                {paymentMethod === 'VIETQR' ? 'Xác Nhận Giữ Slot (Cổng SePay)' : 'Xác Nhận Giữ Slot (Tiền Mặt)'}
-              </span>
+              <span className="material-symbols-outlined text-[18px]">payments</span>
+              <span>Xác Nhận Giữ Slot (Cổng SePay)</span>
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </>
           )}

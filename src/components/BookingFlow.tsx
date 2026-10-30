@@ -35,7 +35,7 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
   const [phone, setPhone] = useState('');
   const [studentId, setStudentId] = useState('');
   const [issueNote, setIssueNote] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'CASH'>('VIETQR');
+  const paymentMethod = 'VIETQR';
   const [formErrors, setFormErrors] = useState<{ name?: string; phone?: string }>({});
 
   // Created Booking State
@@ -511,43 +511,18 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
 
           {/* Payment Method Selector */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-3">Chọn Phương Thức Thanh Toán:</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              <div
-                onClick={() => setPaymentMethod('VIETQR')}
-                className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  paymentMethod === 'VIETQR'
-                    ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
+            <label className="block text-sm font-semibold text-slate-700 mb-3">Phương Thức Thanh Toán:</label>
+            <div className="p-4 rounded-xl border border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
                   <QrCode className="w-5 h-5 text-blue-600" />
-                  <span>Chuyển Khoản VietQR SePay</span>
+                  <span>Chuyển Khoản VietQR SePay (Napas 24/7)</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Quét mã QR tự động điền STK & số tiền {selectedService.price.toLocaleString('vi-VN')}đ, xác nhận tức thì.
-                </p>
+                <span className="text-[11px] font-bold text-emerald-600">Tự động 24/7</span>
               </div>
-
-              <div
-                onClick={() => setPaymentMethod('CASH')}
-                className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  paymentMethod === 'CASH'
-                    ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                  <Smartphone className="w-5 h-5 text-emerald-600" />
-                  <span>Tiền Mặt Tại Sảnh Tự Học</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Giao máy cho kỹ thuật viên tại trạm và thanh toán tiền mặt trực tiếp khi nhận lại tai nghe.
-                </p>
-              </div>
-
+              <p className="text-xs text-slate-500 mt-1">
+                Quét mã QR tự động điền STK & số tiền {selectedService.price.toLocaleString('vi-VN')}đ, xác nhận thanh toán tức thì qua Cổng SePay.
+              </p>
             </div>
           </div>
 
